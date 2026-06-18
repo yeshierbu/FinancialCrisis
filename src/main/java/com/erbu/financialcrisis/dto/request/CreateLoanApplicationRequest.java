@@ -4,12 +4,18 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
 /**
  * 创建贷款申请请求。
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class CreateLoanApplicationRequest {
 
     @NotBlank(message = "产品编码不能为空")
@@ -32,51 +38,8 @@ public class CreateLoanApplicationRequest {
     @Min(value = 1, message = "申请期数必须大于0")
     private Integer loanTerm;
 
-    public String getProductCode() {
-        return productCode;
-    }
-
-    public void setProductCode(String productCode) {
-        this.productCode = productCode;
-    }
-
-    public String getApplicantName() {
-        return applicantName;
-    }
-
-    public void setApplicantName(String applicantName) {
-        this.applicantName = applicantName;
-    }
-
-    public String getIdCardNo() {
-        return idCardNo;
-    }
-
-    public void setIdCardNo(String idCardNo) {
-        this.idCardNo = idCardNo;
-    }
-
-    public String getMobile() {
-        return mobile;
-    }
-
-    public void setMobile(String mobile) {
-        this.mobile = mobile;
-    }
-
-    public BigDecimal getLoanAmount() {
-        return loanAmount;
-    }
-
-    public void setLoanAmount(BigDecimal loanAmount) {
-        this.loanAmount = loanAmount;
-    }
-
-    public Integer getLoanTerm() {
-        return loanTerm;
-    }
-
-    public void setLoanTerm(Integer loanTerm) {
-        this.loanTerm = loanTerm;
-    }
+    private String employmentType;
+    private String companyName;
+    private Integer workYears;
+    private String channelCode;
 }

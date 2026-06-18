@@ -1,7 +1,7 @@
 package com.erbu.financialcrisis.config;
 
-import com.erbu.financialcrisis.common.ApiResponse;
 import com.erbu.financialcrisis.common.BusinessException;
+import com.erbu.financialcrisis.common.Result;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -14,20 +14,20 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
-    public ApiResponse<Void> handleBusinessException(BusinessException ex) {
-        return ApiResponse.fail(ex.getCode(), ex.getMessage());
+    public Result<Void> handleBusinessException(BusinessException ex) {
+        return Result.fail(ex.getCode(), ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ApiResponse<Void> handleValidationException(MethodArgumentNotValidException ex) {
+    public Result<Void> handleValidationException(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getAllErrors().isEmpty()
                 ? "参数校验失败"
                 : ex.getBindingResult().getAllErrors().get(0).getDefaultMessage();
-        return ApiResponse.fail(4001, message);
+        return Result.fail(4001, message);
     }
 
     @ExceptionHandler(Exception.class)
-    public ApiResponse<Void> handleException(Exception ex) {
-        return ApiResponse.fail(5003, ex.getMessage());
+    public Result<Void> handleException(Exception ex) {
+        return Result.fail(5003, ex.getMessage());
     }
 }

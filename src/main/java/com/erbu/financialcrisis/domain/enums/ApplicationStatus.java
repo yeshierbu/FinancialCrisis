@@ -6,10 +6,12 @@ package com.erbu.financialcrisis.domain.enums;
  */
 public enum ApplicationStatus {
     SUBMITTED,
+    DOCUMENT_PENDING,
     MATERIAL_PENDING,
     OCR_PARSING,
     EXTERNAL_VERIFYING,
     RISK_ANALYZING,
+    DECISION_PENDING,
     DECISIONING,
     MANUAL_REVIEW,
     APPROVED,

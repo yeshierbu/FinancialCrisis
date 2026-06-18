@@ -1,46 +1,29 @@
 package com.erbu.financialcrisis.dto.response;
 
 import com.erbu.financialcrisis.domain.enums.ApplicationStatus;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * 贷款申请响应。
  */
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class LoanApplicationResponse {
 
     private Long applicationId;
     private String applicationNo;
+    private String productCode;
+    private String applicantName;
+    private BigDecimal loanAmount;
+    private Integer loanTerm;
     private ApplicationStatus status;
     private String currentStep;
-
-    public Long getApplicationId() {
-        return applicationId;
-    }
-
-    public void setApplicationId(Long applicationId) {
-        this.applicationId = applicationId;
-    }
-
-    public String getApplicationNo() {
-        return applicationNo;
-    }
-
-    public void setApplicationNo(String applicationNo) {
-        this.applicationNo = applicationNo;
-    }
-
-    public ApplicationStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(ApplicationStatus status) {
-        this.status = status;
-    }
-
-    public String getCurrentStep() {
-        return currentStep;
-    }
-
-    public void setCurrentStep(String currentStep) {
-        this.currentStep = currentStep;
-    }
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
