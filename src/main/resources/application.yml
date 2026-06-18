@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: financial-crisis
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+llm:
+  api-key: ${OPENAI_API_KEY:demo-key}
+  base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
+  model: ${OPENAI_MODEL:gpt-4o-mini}

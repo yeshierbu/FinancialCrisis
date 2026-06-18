@@ -1,0 +1,507 @@
+智能信贷审批 Agent 项目计划书
+基于 LangChain4j + Spring Boot 的个人消费贷自动审批系统
+
+一、项目定位
+本项目面向个人消费贷线上自动审批场景，目标是替代部分人工信贷专员在贷前审核中的重复性工作，完成申请资料解析、反欺诈核验、偿债能力评估、政策匹配、授信决策、人工复核流转和报告归档全流程。
+
+项目最终定位建议统一描述为：
+基于 LangChain4j + Spring Boot + RAG + 规则引擎的个人消费贷智能审批系统，实现申请资料解析、反欺诈核验、偿债能力评估、政策检索决策、人工复核流转与审计归档闭环。
+
+
+二、项目建设目标
+1. 业务目标
+- 降低人工初审工作量，提高贷款审批效率
+- 统一审批口径，减少不同审核人员之间的判断偏差
+- 缩短用户从提交申请到拿到审批结果的等待时间
+- 在自动化前提下保留人工复核兜底能力
+
+2. 技术目标
+- 形成可演示、可扩展、可复用的多 Agent 审批架构
+- 构建金融垂直 RAG 知识库，降低大模型幻觉风险
+- 完成工具调用、状态机、审计日志、脱敏、监控等工程化能力
+- 支持后续简历展示、面试讲解和项目二次迭代
+
+3. 合规目标
+- 审批链路全程留痕，满足可追溯要求
+- 审批结论必须可解释，拒贷原因可标准化输出
+- 高风险和证据不足样本必须能转人工，不允许模型自由裁量
+
+
+三、总体架构设计
+系统建议采用“接入层 + 编排层 + 智能体层 + 工具层 + RAG 层 + 支撑层 + 数据层”的分层架构。
+
+1. 接入层
+- Spring Boot 提供 REST API
+- 支持用户提交申请、上传材料、查询进度、提交补件
+- 支持管理端查看待复核工单、风险明细和审批报告
+
+2. 编排层
+- 由 Orchestrator Agent 作为总控
+- 负责创建审批任务、调度各子 Agent、推进状态流转
+- 负责异常重试、人工接管、流程终止或归档
+
+3. 智能体层
+- 信息采集 Agent
+- 反欺诈风控 Agent
+- 偿债能力测算 Agent
+- 合规决策 Agent
+- 报告归档 Agent
+- 人工接管 Agent
+
+4. 工具层
+- OCR 解析工具
+- 征信查询工具
+- 黑名单校验工具
+- 手机号实名认证工具
+- 负债率计算工具
+- 分期月供测算工具
+- 政策检索工具
+- 人工工单推送工具
+
+5. RAG 层
+- 银行信贷政策知识库
+- 合规监管文件知识库
+- 历史欺诈案例知识库
+- 人工审批经验 FAQ 知识库
+
+6. 支撑层
+- Redis 缓存
+- MQ 异步任务
+- Resilience4j 超时重试与熔断
+- 状态机管理
+- 日志与监控
+- 敏感信息脱敏
+
+7. 数据层
+- MySQL 保存申请单、审批结果、日志、审计轨迹
+- MinIO 保存身份证、流水、征信 PDF、报告文件
+- PGVector 或 Elasticsearch 承载知识库检索
+
+
+四、核心业务流程
+1. 用户在线发起贷款申请，填写基本信息并上传身份证、工资流水、征信 PDF。
+2. 调度 Agent 创建审批任务，进入材料解析状态。
+3. 信息采集 Agent 调用 OCR 与文档解析工具，抽取姓名、身份证号、收入、负债、工作年限、逾期记录等结构化字段。
+4. 若材料缺失、过期或图片模糊，则发起补件问答，引导用户重新上传。
+5. 材料齐全后，调用征信、黑名单、实名、设备风险等外部工具。
+6. 反欺诈风控 Agent 输出风险标签、命中规则、风险等级。
+7. 偿债能力测算 Agent 计算 DTI、收入稳定性、现金流冗余、最大可承受月供。
+8. 合规决策 Agent 检索信贷政策条款，结合规则引擎与各 Agent 输出结果做审批决策。
+9. 中风险、规则冲突或外部工具失败时自动转人工复核。
+10. 报告归档 Agent 汇总完整流程，生成审批报告并归档。
+
+
+五、多 Agent 详细分工
+1. Orchestrator Agent
+职责：
+- 负责任务编排和流程推进
+- 按审批状态分配任务给不同 Agent
+- 决定下一步是补件、继续自动审批、转人工还是结束
+
+输入：
+- 申请单
+- 当前审批状态
+- 各 Agent 结构化结果
+
+输出：
+- 下一步任务
+- 流程状态迁移结果
+- 工单或归档动作
+
+2. 信息采集 Agent
+职责：
+- 解析用户上传的身份证、工资流水、征信 PDF
+- 识别姓名、月收入、总负债、工作年限、逾期情况
+- 判断资料是否完整，缺失时主动追问用户
+- 将非结构化材料转换为统一结构化字段
+
+输出：
+- ApplicantProfile
+- IncomeProfile
+- CreditProfile
+- MissingMaterialList
+
+3. 反欺诈风控 Agent
+职责：
+- 检查黑名单、法院失信、多头借贷
+- 识别异地异常申请、设备异常、手机号实名不一致
+- 检查流水是否疑似伪造
+- 输出风险标签和命中规则
+
+风险标签示例：
+- MULTI_LOAN_RISK
+- BLACKLIST_HIT
+- DEVICE_ABNORMAL
+- LOCATION_MISMATCH
+- INCOME_FORGERY_SUSPECT
+- OVERDUE_HISTORY_HIGH
+
+输出：
+- risk_level: LOW / MEDIUM / HIGH
+- risk_tags
+- rule_hits
+- suggested_action
+
+4. 偿债能力测算 Agent
+职责：
+- 统计近 6 个月工资收入
+- 区分固定工资与兼职收入
+- 评估收入波动情况
+- 计算现有债务支出与新增贷款月供压力
+
+关键指标：
+- DTI：月债务支出 / 月稳定收入
+- FOIR：固定支出占收入比
+- Income Stability Score：收入稳定性评分
+- Disposable Income：可支配收入
+- Max Affordable EMI：最大可承受月供
+
+输出：
+- income_assessment
+- debt_assessment
+- repayment_capacity_result
+- recommended_credit_limit
+
+5. 合规决策 Agent
+职责：
+- 结合规则引擎结果、RAG 政策条款、风控结果、偿债指标生成审批结论
+- 自动给出通过、复核、拒贷三类结果
+- 输出额度区间、利率区间、分期期数建议和拒贷原因码
+
+输出：
+- decision: APPROVED / MANUAL_REVIEW / REJECTED
+- credit_limit
+- rate_range
+- installment_plan
+- reject_reason_code
+- policy_references
+- decision_explanation
+
+6. 报告归档 Agent
+职责：
+- 汇总申请信息、工具调用、风险标签、指标计算、决策依据
+- 生成结构化审批报告
+- 保存审计追溯数据
+
+输出：
+- approval_report
+- archive_record
+
+7. 人工接管 Agent
+职责：
+- 接收中风险、冲突样本、接口失败样本
+- 生成待办工单并分配给人工审核
+- 回收人工审核结果并更新主流程
+
+
+六、决策机制设计
+项目不建议把最终审批权完全交给大模型，而应该采用“三层决策机制”：
+
+1. 第一层：规则引擎硬约束
+- 黑名单命中直接拒贷
+- 严重逾期直接拒贷
+- 身份信息不一致直接拒贷
+- 材料疑似造假直接拒贷
+
+2. 第二层：RAG 政策检索
+- 根据申请特征检索适用的信贷政策、监管条款和案例规则
+- 所有审批理由必须关联 policy_id / clause_id
+- 若未检索到明确依据，则转人工复核
+
+3. 第三层：LLM 解释增强
+- 负责整合多 Agent 输出
+- 负责摘要、解释和风险说明
+- 禁止在缺乏规则和条款支持时自由生成审批理由
+
+审批分层建议：
+- 低风险：自动审批通过
+- 中风险：进入人工复核
+- 高风险：自动拒贷
+
+
+七、RAG 知识库建设方案
+1. 知识来源
+- 银行信贷管理办法
+- 消费贷产品准入规则
+- 风险控制规则手册
+- 银保监会监管合规文件
+- 历史拒贷案例与欺诈案例
+- 人工审批经验 FAQ
+
+2. 文档切分策略
+- 按条款级切分，而不是粗粒度整段切分
+- 每个片段保留条款编号、适用产品、风险等级、生效日期、来源文档
+
+3. 检索方案
+- BM25 做关键词召回
+- 向量检索做语义召回
+- Rerank 对召回结果做重排
+- 只把 Top-K 条款传给决策 Agent
+
+4. 防幻觉策略
+- Prompt 强制只能基于检索结果作答
+- 未命中有效条款时直接转人工复核
+- 决策说明必须携带条款引用
+
+
+八、LangChain4j 设计重点
+1. Tool Calling
+建议封装以下工具：
+- ocrParseTool
+- creditReportQueryTool
+- blacklistCheckTool
+- mobileRealNameVerifyTool
+- debtToIncomeCalcTool
+- installmentPlanTool
+- policySearchTool
+- manualReviewTicketTool
+
+2. AI Services
+- 每个 Agent 使用独立 system prompt
+- 输出统一 JSON 结构，方便后续流程消费
+
+3. Memory
+- 保存补件对话、申请上下文、用户修正信息
+- 支持“刚刚上传错了，我重新上传”这类多轮场景
+
+4. RAG 集成
+- 在决策前统一走检索增强链路
+- 将政策条款和案例证据作为上下文输入
+
+5. ReAct 任务拆解
+- 先校验材料
+- 缺材料则追问
+- 材料齐全再做征信和黑名单核验
+- 再做偿债能力计算
+- 最后生成审批结论
+
+
+九、状态机设计
+建议使用持久化状态机管理长流程任务。
+
+状态枚举建议：
+- SUBMITTED
+- MATERIAL_PENDING
+- OCR_PARSING
+- EXTERNAL_VERIFYING
+- RISK_ANALYZING
+- DECISIONING
+- MANUAL_REVIEW
+- APPROVED
+- REJECTED
+- ARCHIVED
+
+状态迁移事件：
+- 用户提交申请
+- 材料缺失
+- 补件完成
+- 外部核验完成
+- 工具调用失败
+- 命中人工复核规则
+- 人工复核完成
+- 报告生成完成
+
+实现方式建议：
+- Spring StateMachine
+或
+- 数据库字段 + 状态迁移表 + 事件驱动逻辑
+
+
+十、数据库表设计
+1. 业务主表
+- loan_application
+- applicant_profile
+- uploaded_document
+- approval_decision
+- manual_review_ticket
+- approval_report
+
+2. 分析结果表
+- credit_assessment
+- fraud_risk_result
+- repayment_capacity_result
+- policy_hit_record
+
+3. 审计日志表
+- agent_task_log
+- tool_call_log
+- llm_trace_log
+- state_transition_log
+
+设计原则：
+- 所有 Agent 输出要结构化存储
+- 决策过程要可回放
+- 工具调用与状态流转要可审计
+
+
+十一、接口设计
+1. 用户端接口
+- POST /api/loan/applications
+- POST /api/loan/applications/{id}/documents
+- POST /api/loan/applications/{id}/supplement
+- GET /api/loan/applications/{id}
+- GET /api/loan/applications/{id}/status
+- GET /api/loan/applications/{id}/report
+
+2. 管理端接口
+- GET /api/admin/reviews/pending
+- POST /api/admin/reviews/{id}/approve
+- POST /api/admin/reviews/{id}/reject
+- GET /api/admin/audit/{applicationId}/timeline
+
+
+十二、异常处理与容错设计
+1. OCR 失败重试 2 次，仍失败则进入人工复核
+2. 征信接口超时则降级读取缓存数据，并标记“非实时数据”
+3. 黑名单接口异常时不得自动通过，必须转人工
+4. RAG 未检索到条款时不得自动拒贷，必须转人工
+5. LLM 输出 JSON 解析失败时，尝试结构化修复和模板重试
+6. 工具多次失败后写入补偿队列异步重试
+
+推荐技术：
+- Resilience4j
+- RabbitMQ 或 Kafka
+- Quartz 或 XXL-Job
+
+
+十三、监控与审计指标
+1. 系统指标
+- Agent 平均执行耗时
+- 工具调用成功率
+- OCR 成功率
+- 第三方接口超时率
+- RAG 检索命中率
+- LLM token 消耗
+
+2. 业务指标
+- 自动审批通过率
+- 人工复核占比
+- 拒贷率
+- 欺诈命中率
+- 补件率
+- 审批平均耗时
+
+3. 模型治理指标
+- 决策一致率
+- 人工纠正率
+- 条款引用准确率
+- 拒贷原因可解释覆盖率
+
+推荐监控栈：
+- Micrometer + Prometheus + Grafana
+- ELK 或 OpenSearch
+
+
+十四、敏感信息脱敏设计
+脱敏范围：
+- API 请求日志
+- LLM Prompt 入参
+- 工具调用日志
+- 审批报告展示副本
+- 管理后台列表页
+
+重点脱敏字段：
+- 身份证号
+- 银行卡号
+- 手机号
+- 家庭住址
+- 征信账号
+- 紧急联系人信息
+
+实现建议：
+- 落地优先方案：Spring AOP + 注解 + Jackson Serializer
+- 高阶亮点方案：Java Agent + ByteBuddy 字节码增强
+
+
+十五、推荐技术栈
+- Spring Boot
+- LangChain4j
+- MySQL
+- Redis
+- PGVector 或 Elasticsearch
+- MinIO
+- RabbitMQ 或 Kafka
+- Resilience4j
+- Spring StateMachine
+- Drools 或自定义规则引擎
+- Prometheus + Grafana
+- ELK
+
+如果想控制复杂度，建议第一版采用：
+Spring Boot + LangChain4j + MySQL + Redis + PGVector + MinIO + RabbitMQ + Resilience4j
+
+
+十六、实施里程碑
+第一期：最小可演示版
+- 申请提交
+- 文件上传
+- OCR 解析
+- 简单规则审批
+- 报告生成
+
+第二期：Agent + RAG 主链路
+- 多 Agent 编排
+- 工具调用
+- 政策知识库
+- 人工复核工单
+- 审计日志
+- 状态机
+
+第三期：工程增强版
+- 缓存
+- MQ 异步化
+- 熔断重试
+- 监控告警
+- 敏感信息脱敏
+- 权限控制
+
+第四期：面试与简历打磨
+- 量化项目指标
+- 沉淀项目亮点
+- 准备答辩口径
+- 形成演示材料
+
+
+十七、简历表达建议
+建议简历写法如下：
+
+1.
+设计并实现基于 LangChain4j + Spring Boot 的智能信贷审批系统，构建调度 Agent、风控 Agent、偿债评估 Agent、合规决策 Agent 等多智能体协同链路，支持消费贷申请自动审批全流程。
+
+2.
+搭建金融垂直 RAG 知识库，融合 BM25 + 向量检索 + Rerank 检索银行信贷政策与监管条款，约束大模型基于政策依据生成审批结论，降低金融场景幻觉风险。
+
+3.
+封装 OCR、征信查询、黑名单校验、负债率计算、人工复核推送等业务工具，支持 Agent 自主 Tool Calling 与多轮 ReAct 任务拆解。
+
+4.
+设计审批状态机、审计日志、敏感信息脱敏与异常重试机制，支持审批过程可追溯、可解释、可人工接管，满足金融合规场景要求。
+
+
+十八、面试高频回答方向
+1. 为什么用多 Agent，而不是单 Agent？
+答：单 Agent 在金融审批场景职责过重，容易出现提示词耦合、决策不稳定、调试困难。多 Agent 拆分责任域后，可解释性、可维护性和审计清晰度更高。
+
+2. 为什么不能让大模型直接审批？
+答：金融审批有监管和稳定性要求，不能把最终结论完全交给大模型自由生成，因此采用“规则引擎硬约束 + RAG 政策引用 + LLM 解释增强”的三层机制。
+
+3. 如何避免幻觉？
+答：通过混合检索召回政策条款，要求模型只基于命中条款输出结论；如果没有明确条款依据，则进入人工复核。
+
+4. 如何保证可追溯？
+答：记录 Agent 输入输出、工具调用日志、状态流转记录、命中条款与审批报告，形成完整审计链路。
+
+
+十九、项目最终建议
+这个项目不要做成“纯聊天审批 Demo”，而应该坚定走下面这条路线：
+审批工作流 + 多 Agent 协同 + 规则引擎 + RAG + 工具调用 + 审计合规
+
+这样它更像真实金融科技项目，更能体现：
+- Java 后端工程能力
+- AI Agent 落地能力
+- 风控和合规理解
+- 系统设计与架构表达能力
+
+
+文档结论：
+该项目具备较强的业务价值、工程价值和面试价值，适合作为金融科技岗、通用 Java 后端岗、AI 应用落地方向的核心项目进行深入实现与展示。
