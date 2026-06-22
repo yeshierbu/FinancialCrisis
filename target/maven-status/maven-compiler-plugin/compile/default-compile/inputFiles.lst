@@ -2,6 +2,7 @@ E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erb
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\agent\DocumentIntakeAgent.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\agent\FraudRiskAgent.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\agent\RepaymentCapacityAgent.java
+E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\agent\result\DocumentIntakeResult.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\common\BusinessException.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\common\Result.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\config\GlobalExceptionHandler.java
@@ -79,3 +80,4 @@ E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erb
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\impl\ManualReviewServiceImpl.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\LoanApplicationService.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\ManualReviewService.java
+E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\store\InMemoryApprovalStore.java

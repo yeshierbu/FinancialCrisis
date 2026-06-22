@@ -8,6 +8,8 @@ import com.erbu.financialcrisis.dto.response.ManualReviewPendingResponse;
 import com.erbu.financialcrisis.dto.response.ManualReviewResponse;
 import com.erbu.financialcrisis.service.ManualReviewService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,12 +31,12 @@ public class AdminReviewController {
         this.manualReviewService = manualReviewService;
     }
 
-    @PostMapping("/pending")
-    public Result<List<ManualReviewPendingResponse>> queryPendingReviews(@RequestBody ManualReviewPendingQueryRequest request) {
+    @GetMapping("/pending")
+    public Result<List<ManualReviewPendingResponse>> queryPendingReviews(@ModelAttribute ManualReviewPendingQueryRequest request) {
         return Result.success(manualReviewService.queryPendingReviews(request));
     }
 
-    @PostMapping("/{applicationId}")
+    @GetMapping("/{applicationId}")
     public Result<ManualReviewDetailResponse> getReviewDetail(@PathVariable Long applicationId) {
         return Result.success(manualReviewService.getReviewDetail(applicationId));
     }

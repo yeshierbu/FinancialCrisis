@@ -1,7 +1,16 @@
 package com.erbu.financialcrisis.agent;
 
+import com.erbu.financialcrisis.agent.result.DocumentIntakeResult;
+import com.erbu.financialcrisis.domain.entity.ApprovalDecision;
+import com.erbu.financialcrisis.domain.entity.FraudRiskResult;
 import com.erbu.financialcrisis.domain.entity.LoanApplication;
+import com.erbu.financialcrisis.domain.entity.RepaymentCapacityResult;
+import com.erbu.financialcrisis.domain.enums.DecisionResult;
+import com.erbu.financialcrisis.domain.enums.RiskLevel;
 import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * 合规决策 Agent。
@@ -10,12 +19,86 @@ import org.springframework.stereotype.Component;
 @Component
 public class ComplianceDecisionAgent {
 
-    public void decide(LoanApplication application) {
-        // TODO: 1. 入参合法性、业务单据状态前置校验
-        // TODO: 2. 数据库新增/更新/查询操作（调用Mapper）
-        // TODO: 3. 业务单据状态流转变更
-        // TODO: 4. 同步数据到外部工单/消息系统
-        // TODO: 5. 记录操作审计日志、状态变更日志
-        // TODO: 6. 封装返回结果/抛出业务异常
+    public ApprovalDecision decide(LoanApplication application,
+                                   DocumentIntakeResult documentResult,
+                                   FraudRiskResult fraudRiskResult,
+                                   RepaymentCapacityResult repaymentResult) {
+        /*
+         * 决策顺序很重要：先处理硬性不可继续条件，再判断人工复核，最后才自动通过。
+         * 这样能避免“大模型/解释文本”覆盖硬规则，也方便后续把这些判断迁移到规则引擎。
+         */
+        if (Boolean.TRUE.equals(documentResult.getNeedSupplement())) {
+            return buildDecision(
+                    application,
+                    DecisionResult.MANUAL_REVIEW,
+                    BigDecimal.ZERO,
+                    "DOCUMENT_PENDING",
+                    "材料不完整，需补件或人工确认后再继续审批"
+            );
+        }
+
+        if ("REJECT".equals(fraudRiskResult.getSuggestedAction())) {
+            return buildDecision(
+                    application,
+                    DecisionResult.REJECTED,
+                    BigDecimal.ZERO,
+                    "BLACKLIST_HIT",
+                    "反欺诈规则命中本地模拟黑名单，触发硬性拒绝策略"
+            );
+        }
+
+        if (repaymentResult.getDti().compareTo(new BigDecimal("0.70")) > 0) {
+            return buildDecision(
+                    application,
+                    DecisionResult.REJECTED,
+                    BigDecimal.ZERO,
+                    "DTI_TOO_HIGH",
+                    "债务收入比超过 70%，偿债压力过高，不满足自动准入条件"
+            );
+        }
+
+        if (fraudRiskResult.getRiskLevel() == RiskLevel.MEDIUM
+                || fraudRiskResult.getRiskLevel() == RiskLevel.HIGH
+                || repaymentResult.getDti().compareTo(new BigDecimal("0.50")) > 0) {
+            return buildDecision(
+                    application,
+                    DecisionResult.MANUAL_REVIEW,
+                    BigDecimal.ZERO,
+                    "NEED_MANUAL_CONFIRM",
+                    "风险等级或偿债指标处于边界区间，转人工复核确认"
+            );
+        }
+
+        BigDecimal approvedAmount = application.getLoanAmount().min(repaymentResult.getRecommendedCreditLimit());
+        return buildDecision(
+                application,
+                DecisionResult.APPROVED,
+                approvedAmount,
+                null,
+                "风险等级低且偿债能力满足规则，系统自动审批通过"
+        );
+    }
+
+    private ApprovalDecision buildDecision(LoanApplication application,
+                                           DecisionResult decisionResult,
+                                           BigDecimal approvedAmount,
+                                           String rejectReasonCode,
+                                           String decisionExplanation) {
+        LocalDateTime now = LocalDateTime.now();
+        return new ApprovalDecision(
+                null,
+                application.getApplicationId(),
+                decisionResult,
+                approvedAmount,
+                new BigDecimal("10.80"),
+                application.getLoanTerm(),
+                rejectReasonCode,
+                decisionExplanation,
+                "[\"POLICY_CONSUMER_LOAN_001#AUTO_APPROVAL_BOUNDARY\"]",
+                "RULE_AGENT",
+                now,
+                now,
+                now
+        );
     }
 }

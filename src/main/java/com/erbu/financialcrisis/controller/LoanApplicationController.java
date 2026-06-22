@@ -6,6 +6,7 @@ import com.erbu.financialcrisis.dto.response.ApplicationStatusResponse;
 import com.erbu.financialcrisis.dto.response.LoanApplicationResponse;
 import com.erbu.financialcrisis.service.LoanApplicationService;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,12 +31,12 @@ public class LoanApplicationController {
         return Result.success(loanApplicationService.createApplication(request));
     }
 
-    @PostMapping("/{applicationId}")
+    @GetMapping("/{applicationId}")
     public Result<LoanApplicationResponse> getApplication(@PathVariable Long applicationId) {
         return Result.success(loanApplicationService.getApplication(applicationId));
     }
 
-    @PostMapping("/{applicationId}/status")
+    @GetMapping("/{applicationId}/status")
     public Result<ApplicationStatusResponse> getApplicationStatus(@PathVariable Long applicationId) {
         return Result.success(loanApplicationService.getApplicationStatus(applicationId));
     }

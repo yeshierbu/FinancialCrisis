@@ -3,8 +3,8 @@ package com.erbu.financialcrisis.controller;
 import com.erbu.financialcrisis.common.Result;
 import com.erbu.financialcrisis.dto.response.ApprovalReportResponse;
 import com.erbu.financialcrisis.service.ApprovalReportService;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,7 +21,7 @@ public class ApprovalReportController {
         this.approvalReportService = approvalReportService;
     }
 
-    @PostMapping("/{applicationId}/report")
+    @GetMapping("/{applicationId}/report")
     public Result<ApprovalReportResponse> getReport(@PathVariable Long applicationId) {
         return Result.success(approvalReportService.getReport(applicationId));
     }

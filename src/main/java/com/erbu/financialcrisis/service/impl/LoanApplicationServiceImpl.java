@@ -1,48 +1,143 @@
 package com.erbu.financialcrisis.service.impl;
 
+import com.erbu.financialcrisis.domain.entity.LoanApplication;
+import com.erbu.financialcrisis.domain.entity.StateTransitionLog;
+import com.erbu.financialcrisis.domain.enums.ApplicationStatus;
+import com.erbu.financialcrisis.domain.enums.OperatorType;
 import com.erbu.financialcrisis.dto.request.CreateLoanApplicationRequest;
 import com.erbu.financialcrisis.dto.response.ApplicationStatusResponse;
 import com.erbu.financialcrisis.dto.response.LoanApplicationResponse;
+import com.erbu.financialcrisis.dto.response.StatusTimelineResponse;
+import com.erbu.financialcrisis.service.AgentOrchestrationService;
 import com.erbu.financialcrisis.service.LoanApplicationService;
+import com.erbu.financialcrisis.store.InMemoryApprovalStore;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * 贷款申请业务服务实现。
- * 第一版只保留方法骨架，后续可以接数据库、工单系统和审计日志。
+ *
+ * <p>第一版按照指导书建议使用内存存储和同步编排，让申请主流程先跑通。
+ * 后续接 MySQL 时，create/get/status 三个方法的边界可以保持不变，只把 store 调用替换为 Mapper。</p>
  */
 @Service
 public class LoanApplicationServiceImpl implements LoanApplicationService {
 
+    private final InMemoryApprovalStore store;
+    private final AgentOrchestrationService agentOrchestrationService;
+
+    public LoanApplicationServiceImpl(InMemoryApprovalStore store,
+                                      AgentOrchestrationService agentOrchestrationService) {
+        this.store = store;
+        this.agentOrchestrationService = agentOrchestrationService;
+    }
+
     @Override
     public LoanApplicationResponse createApplication(CreateLoanApplicationRequest request) {
-        // TODO: 1. 入参合法性、业务单据状态前置校验
-        // TODO: 2. 数据库新增/更新/查询操作（调用Mapper）
-        // TODO: 3. 业务单据状态流转变更
-        // TODO: 4. 同步数据到外部工单/消息系统
-        // TODO: 5. 记录操作审计日志、状态变更日志
-        // TODO: 6. 封装返回结果/抛出业务异常
-        return null;
+        Long applicationId = store.nextApplicationId();
+        LocalDateTime now = LocalDateTime.now();
+
+        LoanApplication application = new LoanApplication(
+                applicationId,
+                generateApplicationNo(applicationId),
+                request.getProductCode(),
+                request.getApplicantName(),
+                request.getIdCardNo(),
+                request.getMobile(),
+                request.getLoanAmount(),
+                request.getLoanTerm(),
+                request.getEmploymentType(),
+                request.getCompanyName(),
+                request.getWorkYears(),
+                null,
+                null,
+                request.getChannelCode(),
+                now,
+                now
+        );
+
+        store.saveApplication(application);
+        store.changeStatus(
+                application,
+                ApplicationStatus.SUBMITTED,
+                "申请已提交，等待自动审批预处理",
+                "CREATE_APPLICATION",
+                OperatorType.USER,
+                request.getApplicantName(),
+                "用户提交贷款申请"
+        );
+
+        /*
+         * 文档建议创建申请后立即启动审批编排。当前没有异步队列，所以采用同步调用：
+         * 如果资料还没上传，编排会把申请推进到 DOCUMENT_PENDING，前端即可展示补件状态。
+         */
+        agentOrchestrationService.startApprovalFlow(applicationId);
+        return toResponse(store.getApplicationOrThrow(applicationId));
     }
 
     @Override
     public LoanApplicationResponse getApplication(Long applicationId) {
-        // TODO: 1. 入参合法性、业务单据状态前置校验
-        // TODO: 2. 数据库新增/更新/查询操作（调用Mapper）
-        // TODO: 3. 业务单据状态流转变更
-        // TODO: 4. 同步数据到外部工单/消息系统
-        // TODO: 5. 记录操作审计日志、状态变更日志
-        // TODO: 6. 封装返回结果/抛出业务异常
-        return null;
+        return toResponse(store.getApplicationOrThrow(applicationId));
     }
 
     @Override
     public ApplicationStatusResponse getApplicationStatus(Long applicationId) {
-        // TODO: 1. 入参合法性、业务单据状态前置校验
-        // TODO: 2. 数据库新增/更新/查询操作（调用Mapper）
-        // TODO: 3. 业务单据状态流转变更
-        // TODO: 4. 同步数据到外部工单/消息系统
-        // TODO: 5. 记录操作审计日志、状态变更日志
-        // TODO: 6. 封装返回结果/抛出业务异常
-        return null;
+        LoanApplication application = store.getApplicationOrThrow(applicationId);
+        List<StatusTimelineResponse> timeline = store.listStateLogs(applicationId).stream()
+                .map(this::toTimelineResponse)
+                .toList();
+
+        return new ApplicationStatusResponse(
+                application.getApplicationId(),
+                application.getStatus(),
+                statusDesc(application.getStatus()),
+                application.getUpdatedAt(),
+                timeline
+        );
+    }
+
+    private String generateApplicationNo(Long applicationId) {
+        return "APP" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + String.format("%06d", applicationId);
+    }
+
+    private LoanApplicationResponse toResponse(LoanApplication application) {
+        return new LoanApplicationResponse(
+                application.getApplicationId(),
+                application.getApplicationNo(),
+                application.getProductCode(),
+                application.getApplicantName(),
+                application.getLoanAmount(),
+                application.getLoanTerm(),
+                application.getStatus(),
+                application.getCurrentStep(),
+                application.getCreatedAt(),
+                application.getUpdatedAt()
+        );
+    }
+
+    private StatusTimelineResponse toTimelineResponse(StateTransitionLog log) {
+        return new StatusTimelineResponse(log.getToStatus(), log.getCreatedAt());
+    }
+
+    private String statusDesc(ApplicationStatus status) {
+        if (status == null) {
+            return "未知状态";
+        }
+        return switch (status) {
+            case SUBMITTED -> "申请已提交";
+            case DOCUMENT_PENDING, MATERIAL_PENDING -> "等待补充材料";
+            case OCR_PARSING -> "材料解析中";
+            case EXTERNAL_VERIFYING -> "外部核验中";
+            case RISK_ANALYZING -> "风险分析中";
+            case DECISION_PENDING, DECISIONING -> "审批决策中";
+            case MANUAL_REVIEW -> "人工复核中";
+            case APPROVED -> "审批通过";
+            case REJECTED -> "审批拒绝";
+            case ARCHIVED -> "已归档";
+        };
     }
 }
