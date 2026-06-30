@@ -70,6 +70,12 @@ class FinancialCrisisApplicationTests {
                 .andExpect(jsonPath("$.code").value(0))
                 .andExpect(jsonPath("$.data.status").value("APPROVED"));
 
+        mockMvc.perform(get("/api/loan/applications"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].applicationId").value(applicationId));
+
         mockMvc.perform(get("/api/loan/applications/{applicationId}/report", applicationId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))

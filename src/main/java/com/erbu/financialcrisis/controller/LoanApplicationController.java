@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 /**
  * 用户端申请入口。
  */
@@ -24,6 +26,11 @@ public class LoanApplicationController {
 
     public LoanApplicationController(LoanApplicationService loanApplicationService) {
         this.loanApplicationService = loanApplicationService;
+    }
+
+    @GetMapping
+    public Result<List<LoanApplicationResponse>> listApplications() {
+        return Result.success(loanApplicationService.listApplications());
     }
 
     @PostMapping

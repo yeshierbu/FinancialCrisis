@@ -80,6 +80,13 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     }
 
     @Override
+    public List<LoanApplicationResponse> listApplications() {
+        return store.listApplications().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
     public LoanApplicationResponse getApplication(Long applicationId) {
         return toResponse(store.getApplicationOrThrow(applicationId));
     }
