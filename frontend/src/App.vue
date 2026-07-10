@@ -1,5 +1,5 @@
 ﻿<template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen">
     <Navbar
       :current-view="currentView"
       :is-logged-in="isLoggedIn"
@@ -7,7 +7,7 @@
       @login="handleLogin"
     />
 
-    <main class="mx-auto w-full max-w-7xl px-4 py-8">
+    <main class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
       <HomePage
         v-if="currentView === 'home'"
         @start-application="handleNavigate('apply')"

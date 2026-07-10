@@ -2,15 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
 * {
   box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: #f6f8fc;
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  background: #f8fafc;
-  color: #1f2937;
+  background:
+    radial-gradient(circle at 8% -10%, rgba(191, 219, 254, 0.45), transparent 30rem),
+    radial-gradient(circle at 92% 0%, rgba(224, 231, 255, 0.45), transparent 26rem),
+    #f6f8fc;
+  color: #15243b;
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
@@ -25,14 +39,19 @@ button:disabled {
   cursor: not-allowed;
 }
 
+::selection {
+  background: #bfdbfe;
+  color: #172554;
+}
+
 .animate-fadeIn {
-  animation: fadeIn 0.24s ease-out;
+  animation: fadeIn 0.32s ease-out;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px);
   }
 
   to {
@@ -41,36 +60,94 @@ button:disabled {
   }
 }
 
+.hero-surface {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 82% 12%, rgba(56, 189, 248, 0.22), transparent 22rem),
+    radial-gradient(circle at 28% 100%, rgba(99, 102, 241, 0.25), transparent 28rem),
+    linear-gradient(135deg, #0b1730 0%, #111f43 54%, #102b56 100%);
+}
+
+.hero-surface::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 42px 42px;
+  content: "";
+  mask-image: linear-gradient(to bottom right, black, transparent 76%);
+}
+
+.glass-panel {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(7, 18, 43, 0.46);
+  box-shadow: 0 24px 70px rgba(3, 10, 28, 0.2);
+  backdrop-filter: blur(18px);
+}
+
+.eyebrow {
+  @apply text-xs font-semibold uppercase tracking-[0.2em] text-slate-400;
+}
+
+.section-title {
+  @apply mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl;
+}
+
+.metric-card {
+  @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)];
+}
+
+.feature-card {
+  @apply rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-1 hover:border-blue-100 hover:shadow-[0_18px_38px_rgba(15,23,42,0.08)];
+}
+
 .form-input {
-  @apply w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-gray-800 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100;
+  @apply w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-100;
 }
 
 .form-label {
-  @apply mb-2 block text-sm font-medium text-gray-700;
+  @apply mb-2 block text-sm font-semibold text-slate-700;
 }
 
 .btn-primary {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-3 font-medium text-white shadow-sm transition hover:bg-primary-700 disabled:bg-gray-200 disabled:text-gray-400;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg hover:shadow-primary-600/20 disabled:translate-y-0 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none;
 }
 
 .btn-secondary {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gray-100 px-5 py-3 font-medium text-gray-700 transition hover:bg-gray-200 disabled:text-gray-400;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-md disabled:translate-y-0 disabled:text-slate-400 disabled:shadow-none;
+}
+
+.btn-hero {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-semibold text-slate-950 shadow-lg shadow-slate-950/10 transition hover:-translate-y-0.5 hover:bg-cyan-50;
+}
+
+.btn-hero-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-3 font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10;
 }
 
 .btn-success {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-success-500 px-5 py-3 font-medium text-white transition hover:bg-success-600;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-success-500 px-5 py-3 font-semibold text-white transition hover:bg-success-600;
 }
 
 .btn-danger {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-danger-500 px-5 py-3 font-medium text-white transition hover:bg-danger-600;
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-danger-500 px-5 py-3 font-semibold text-white transition hover:bg-danger-600;
 }
 
 .card {
-  @apply rounded-lg border border-gray-100 bg-white p-6 shadow-sm;
+  @apply rounded-3xl border border-slate-200/80 bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.04)];
 }
 
 .status-badge {
-  @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium;
+  @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold;
+}
+
+.status-badge::before {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 9999px;
+  background: currentColor;
+  content: "";
 }
 
 .status-submitted {
@@ -102,7 +179,7 @@ button:disabled {
 }
 
 .step-active {
-  @apply bg-primary-600 text-white;
+  @apply bg-primary-600 text-white shadow-md shadow-primary-600/20;
 }
 
 .step-completed {
@@ -110,5 +187,9 @@ button:disabled {
 }
 
 .step-inactive {
-  @apply bg-gray-100 text-gray-400;
+  @apply bg-slate-100 text-slate-400;
+}
+
+.nav-link {
+  @apply inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition;
 }

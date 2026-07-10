@@ -21,6 +21,9 @@ mybatis:
     map-underscore-to-camel-case: true
 
 llm:
-  api-key: ${DEEPSEEK_API_KEY:demo-key}
-  base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
-  model: ${OPENAI_MODEL:gpt-4o-mini}
+  # 不把真实 Key 写入仓库；本地环境设置 DEEPSEEK_API_KEY 即可启用。
+  api-key: ${DEEPSEEK_API_KEY:disabled}
+  enabled: ${LLM_ENABLED:true}
+  base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+  model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:45}

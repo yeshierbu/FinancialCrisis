@@ -2,7 +2,7 @@
 
 基于 `Spring Boot + Vue 3 + LangChain4j` 的智能信贷审批演示项目。项目围绕“线上贷款申请 -> 材料提交 -> Agent 自动审批 -> 状态追踪 -> 人工复核/审批报告”的主流程搭建，适合用于智能信贷、风控审批、多 Agent 编排、审计留痕等场景的课程设计、项目展示或二次开发。
 
-> 当前版本重点是跑通端到端业务链路：前端提交申请和材料元数据，后端使用本地规则与模拟 OCR 完成自动审批编排。数据库、真实文件存储、真实 OCR、征信/反欺诈外部接口和正式鉴权仍属于后续扩展方向。
+> 当前版本重点是跑通端到端业务链路：前端提交申请和材料元数据，后端使用本地规则、模拟 OCR 和 DeepSeek 大模型辅助审查完成自动审批编排。数据库、真实文件存储、真实 OCR、征信/反欺诈外部接口和正式鉴权仍属于后续扩展方向。
 
 ## 项目功能
 
@@ -19,7 +19,9 @@
 
 - 申请单管理：创建、查询、列表、状态查询。
 - 材料管理：接收材料元数据，校验文件类型和大小，驱动审批流程继续执行。
-- Agent 编排：按顺序执行材料采集、反欺诈风控、偿债能力测算、合规决策等 Agent。
+- Agent 编排：由 Supervisor 按顺序协调材料采集、反欺诈风控、偿债能力测算、交叉审查和合规决策等 Agent。
+- 多 Agent 协作：通过共享案件上下文传递结构化发现，由 `ApprovalCriticAgent` 检查专业 Agent 之间的边界风险和结论冲突。
+- DeepSeek LLM 审查：材料齐全后调用 `deepseek-v4-flash` 对风险结论进行 JSON 格式复核；没有 API Key 或调用失败时自动回退到本地规则。
 - 补件判断：材料不完整时进入 `DOCUMENT_PENDING` 状态，等待用户补充材料。
 - 自动审批决策：根据风险规则、DTI、推荐额度等指标输出通过、拒绝或人工复核。
 - 人工复核：支持管理端查询待复核工单，并执行人工通过或拒绝。
@@ -37,11 +39,12 @@ flowchart TD
     E --> C
     C -->|材料齐全| F[FraudRiskAgent 反欺诈风险评估]
     F --> G[RepaymentCapacityAgent 偿债能力测算]
-    G --> H[ComplianceDecisionAgent 合规决策]
-    H -->|自动通过| I[APPROVED 审批通过]
-    H -->|自动拒绝| J[REJECTED 审批拒绝]
-    H -->|边界风险| K[MANUAL_REVIEW 人工复核]
-    K --> L[审核员人工通过/拒绝]
+    G --> H[ApprovalCriticAgent 交叉复核共享上下文]
+    H --> I[ComplianceDecisionAgent 合规决策]
+    I -->|自动通过| J[APPROVED 审批通过]
+    I -->|自动拒绝| K[REJECTED 审批拒绝]
+    I -->|边界风险| L[MANUAL_REVIEW 人工复核]
+    L --> M[审核员人工通过/拒绝]
 ```
 
 ## 技术栈
@@ -79,7 +82,8 @@ FinancialCrisis
 ├── src
 │   ├── main
 │   │   ├── java/com/erbu/financialcrisis
-│   │   │   ├── agent               # 审批 Agent：材料、风控、偿债、合规决策
+│   │   │   ├── agent               # 审批 Agent：材料、风控、偿债、审查、DeepSeek、合规决策
+│   │   │   │   └── collaboration    # 共享案件上下文与结构化 Agent 发现
 │   │   │   ├── common              # 统一响应、业务异常
 │   │   │   ├── config              # 全局异常处理、LangChain4j 配置
 │   │   │   ├── controller          # 用户端和管理端 REST API
@@ -161,20 +165,34 @@ spring:
     url: jdbc:h2:mem:financial_crisis;MODE=MySQL;DATABASE_TO_LOWER=TRUE
 
 llm:
-  api-key: ${DEEPSEEK_API_KEY:demo-key}
-  base-url: ${OPENAI_BASE_URL:https://api.openai.com/v1}
-  model: ${OPENAI_MODEL:gpt-4o-mini}
+  api-key: ${DEEPSEEK_API_KEY:disabled}
+  enabled: ${LLM_ENABLED:true}
+  base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+  model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+  timeout-seconds: ${LLM_TIMEOUT_SECONDS:45}
 ```
+
+DeepSeek 使用 OpenAI 兼容接口，默认 Base URL 为 `https://api.deepseek.com`，模型为 `deepseek-v4-flash`。正式运行前请在本地环境变量或 IDE Run Configuration 中配置 API Key，不要写入仓库：
+
+```bash
+export DEEPSEEK_API_KEY="your-local-key"
+export LLM_ENABLED=true
+mvn spring-boot:run
+```
+
+模型只在材料齐全、规则 Agent 已完成初步分析后调用。LLM 结果只能升级为人工复核，不能放宽本地规则的硬性拒绝或人工复核结论；API Key 缺失、超时、接口异常或 JSON 解析失败时，系统自动使用本地规则继续审批。
 
 可通过环境变量覆盖大模型配置：
 
 | 环境变量 | 说明 |
 | --- | --- |
-| `DEEPSEEK_API_KEY` | LLM API Key，默认 `demo-key` |
-| `OPENAI_BASE_URL` | OpenAI 兼容接口地址，默认 `https://api.openai.com/v1` |
-| `OPENAI_MODEL` | 模型名称，默认 `gpt-4o-mini` |
+| `DEEPSEEK_API_KEY` | DeepSeek API Key，默认不启用真实调用 |
+| `LLM_ENABLED` | 是否启用 LLM 审查，默认 `true`；没有 Key 时自动规则兜底 |
+| `DEEPSEEK_BASE_URL` | DeepSeek OpenAI 兼容接口地址，默认 `https://api.deepseek.com` |
+| `DEEPSEEK_MODEL` | 模型名称，默认 `deepseek-v4-flash` |
+| `LLM_TIMEOUT_SECONDS` | 单次 LLM 调用超时时间，默认 45 秒 |
 
-当前业务 Agent 主要使用本地规则与模拟数据，`LangChain4jConfig` 提供的是后续接入真实大模型能力的基础 Bean。
+`LangChain4jConfig` 负责创建 DeepSeek 兼容的 `ChatLanguageModel`，`LlmApprovalAgent` 负责拼装最小案件上下文、解析 JSON 结果和执行安全降级。
 
 ## API 概览
 
@@ -217,6 +235,8 @@ llm:
 ## 当前版本说明
 
 - 当前后端核心数据保存在 `InMemoryApprovalStore` 中，应用重启后数据会清空。
+- 当前 Agent 协作上下文在一次审批流程内共享，协作结果通过 Agent 任务日志和审计时间线留痕。
+- LLM 调用默认关闭请求/响应日志，避免把申请信息写入普通应用日志；API Key 只从环境变量读取。
 - 项目中已经存在实体、枚举和 Mapper 层，为后续迁移到 MySQL/MyBatis 持久化做了结构预留。
 - 文件上传当前只提交材料元数据，不上传真实文件内容。
 - OCR 当前为本地模拟逻辑，材料齐全后会把文档标记为解析成功。
@@ -230,6 +250,6 @@ llm:
 - 接入真实文件上传、对象存储和 OCR 服务。
 - 接入征信、黑名单、多头借贷、设备指纹等外部风控数据源。
 - 将规则逻辑抽象为规则引擎或可配置策略。
-- 引入真实 LLM/RAG，用于政策条款检索、审批解释生成和人工复核辅助。
+- 引入 RAG，用于政策条款检索、审批解释生成和人工复核辅助。
 - 增加用户认证、角色权限和管理后台页面。
 - 完善单元测试、接口测试和前端构建流水线。

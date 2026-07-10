@@ -1,6 +1,7 @@
 package com.erbu.financialcrisis.agent;
 
 import com.erbu.financialcrisis.agent.result.DocumentIntakeResult;
+import com.erbu.financialcrisis.agent.result.PolicyReviewResult;
 import com.erbu.financialcrisis.domain.entity.ApprovalDecision;
 import com.erbu.financialcrisis.domain.entity.FraudRiskResult;
 import com.erbu.financialcrisis.domain.entity.LoanApplication;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 合规决策 Agent。
@@ -23,6 +25,20 @@ public class ComplianceDecisionAgent {
                                    DocumentIntakeResult documentResult,
                                    FraudRiskResult fraudRiskResult,
                                    RepaymentCapacityResult repaymentResult) {
+        return decide(
+                application,
+                documentResult,
+                fraudRiskResult,
+                repaymentResult,
+                new PolicyReviewResult(false, false, "PASS", new BigDecimal("0.90"), List.of(), "未启用审查 Agent", "RULE_FALLBACK")
+        );
+    }
+
+    public ApprovalDecision decide(LoanApplication application,
+                                   DocumentIntakeResult documentResult,
+                                   FraudRiskResult fraudRiskResult,
+                                   RepaymentCapacityResult repaymentResult,
+                                   PolicyReviewResult policyReviewResult) {
         /*
          * 决策顺序很重要：先处理硬性不可继续条件，再判断人工复核，最后才自动通过。
          * 这样能避免“大模型/解释文本”覆盖硬规则，也方便后续把这些判断迁移到规则引擎。
@@ -47,6 +63,16 @@ public class ComplianceDecisionAgent {
             );
         }
 
+        if ("REJECT".equals(policyReviewResult.getRecommendedAction())) {
+            return buildDecision(
+                    application,
+                    DecisionResult.REJECTED,
+                    BigDecimal.ZERO,
+                    "POLICY_REVIEW_REJECT",
+                    "审查 Agent 确认存在硬性风险条件，规则决策拒绝"
+            );
+        }
+
         if (repaymentResult.getDti().compareTo(new BigDecimal("0.70")) > 0) {
             return buildDecision(
                     application,
@@ -57,7 +83,8 @@ public class ComplianceDecisionAgent {
             );
         }
 
-        if (fraudRiskResult.getRiskLevel() == RiskLevel.MEDIUM
+        if (Boolean.TRUE.equals(policyReviewResult.getNeedManualReview())
+                || fraudRiskResult.getRiskLevel() == RiskLevel.MEDIUM
                 || fraudRiskResult.getRiskLevel() == RiskLevel.HIGH
                 || repaymentResult.getDti().compareTo(new BigDecimal("0.50")) > 0) {
             return buildDecision(
@@ -65,7 +92,7 @@ public class ComplianceDecisionAgent {
                     DecisionResult.MANUAL_REVIEW,
                     BigDecimal.ZERO,
                     "NEED_MANUAL_CONFIRM",
-                    "风险等级或偿债指标处于边界区间，转人工复核确认"
+                    "审查 Agent 发现风险边界或结论冲突，转人工复核确认：" + policyReviewResult.getSummary()
             );
         }
 

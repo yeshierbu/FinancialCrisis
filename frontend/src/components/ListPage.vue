@@ -1,12 +1,13 @@
 ﻿<template>
-  <div class="animate-fadeIn space-y-6">
+  <div class="animate-fadeIn space-y-7">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="text-sm font-medium text-primary-600">申请记录</p>
-        <h1 class="text-2xl font-bold text-gray-950">后端申请列表</h1>
+        <p class="eyebrow text-primary-600">Portfolio overview</p>
+        <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">申请记录</h1>
+        <p class="mt-2 text-sm text-slate-500">查看所有申请的当前状态和审批结果。</p>
       </div>
       <div class="flex gap-3">
-        <button class="btn-secondary" @click="loadApplications">
+        <button class="btn-secondary" :disabled="loading" @click="loadApplications">
           <RefreshCw class="h-5 w-5" :class="loading ? 'animate-spin' : ''" />
           刷新
         </button>
@@ -14,7 +15,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card !p-5 sm:!p-6">
       <div class="grid gap-4 md:grid-cols-[1fr_220px]">
         <label class="relative block">
           <Search class="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
@@ -28,9 +29,9 @@
     </div>
 
     <div class="grid gap-4 md:grid-cols-4">
-      <div v-for="item in statistics" :key="item.label" class="card">
-        <p class="text-2xl font-bold" :class="item.color">{{ item.value }}</p>
-        <p class="mt-1 text-sm text-gray-500">{{ item.label }}</p>
+      <div v-for="item in statistics" :key="item.label" class="metric-card">
+        <p class="text-2xl font-semibold" :class="item.color">{{ item.value }}</p>
+        <p class="mt-1 text-sm text-slate-500">{{ item.label }}</p>
       </div>
     </div>
 
@@ -38,21 +39,21 @@
       {{ errorMessage }}
     </div>
 
-    <div class="card overflow-hidden p-0">
-      <div v-if="loading" class="flex items-center gap-3 p-6 text-gray-600">
+    <div class="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+      <div v-if="loading" class="flex items-center gap-3 p-8 text-slate-600">
         <Loader2 class="h-5 w-5 animate-spin" />
         正在从后端读取申请记录...
       </div>
 
       <div v-else-if="filteredApplications.length === 0" class="p-12 text-center">
-        <FileQuestion class="mx-auto mb-4 h-12 w-12 text-gray-300" />
-        <h2 class="text-lg font-semibold text-gray-900">暂无申请记录</h2>
-        <p class="mt-2 text-sm text-gray-500">内存数据库为空，请先发起一笔申请。</p>
+        <FileQuestion class="mx-auto mb-4 h-12 w-12 text-slate-300" />
+        <h2 class="text-lg font-semibold text-slate-900">暂无申请记录</h2>
+        <p class="mt-2 text-sm text-slate-500">内存数据库为空，请先发起一笔申请。</p>
       </div>
 
       <div v-else class="overflow-x-auto">
         <table class="w-full min-w-[860px] text-left text-sm">
-          <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+          <thead class="bg-slate-50/80 text-xs uppercase tracking-wider text-slate-500">
             <tr>
               <th class="px-6 py-3 font-medium">申请编号</th>
               <th class="px-6 py-3 font-medium">申请人</th>
@@ -65,16 +66,16 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <tr v-for="item in pagedApplications" :key="item.applicationId" class="hover:bg-gray-50">
-              <td class="px-6 py-4 font-medium text-primary-700">{{ item.applicationNo }}</td>
-              <td class="px-6 py-4 text-gray-800">{{ item.applicantName }}</td>
-              <td class="px-6 py-4 text-gray-600">{{ getProductName(item.productCode) }}</td>
-              <td class="px-6 py-4 text-gray-800">{{ formatMoney(item.loanAmount) }}</td>
-              <td class="px-6 py-4 text-gray-600">{{ item.loanTerm }} 个月</td>
+            <tr v-for="item in pagedApplications" :key="item.applicationId" class="transition hover:bg-blue-50/40">
+              <td class="px-6 py-4 font-semibold text-primary-700">{{ item.applicationNo }}</td>
+              <td class="px-6 py-4 font-medium text-slate-800">{{ item.applicantName }}</td>
+              <td class="px-6 py-4 text-slate-600">{{ getProductName(item.productCode) }}</td>
+              <td class="px-6 py-4 font-semibold text-slate-800">{{ formatMoney(item.loanAmount) }}</td>
+              <td class="px-6 py-4 text-slate-600">{{ item.loanTerm }} 个月</td>
               <td class="px-6 py-4">
                 <span :class="['status-badge', getStatusClass(item.status)]">{{ getStatusText(item.status) }}</span>
               </td>
-              <td class="px-6 py-4 text-gray-500">{{ formatDate(item.createdAt) }}</td>
+              <td class="px-6 py-4 text-slate-500">{{ formatDate(item.createdAt) }}</td>
               <td class="px-6 py-4">
                 <button class="rounded-lg p-2 text-primary-600 hover:bg-primary-50" title="查看详情" @click="$emit('view-detail', item.applicationId)">
                   <Eye class="h-5 w-5" />
@@ -85,7 +86,7 @@
         </table>
       </div>
 
-      <div v-if="filteredApplications.length > 0" class="flex items-center justify-between border-t border-gray-100 px-6 py-4 text-sm text-gray-500">
+      <div v-if="filteredApplications.length > 0" class="flex items-center justify-between border-t border-slate-100 px-6 py-4 text-sm text-slate-500">
         <span>共 {{ filteredApplications.length }} 条记录</span>
         <div class="flex items-center gap-2">
           <button class="btn-secondary px-3 py-2" :disabled="currentPage === 1" @click="currentPage--">
