@@ -18,6 +18,7 @@ public class RepaymentCapacityAgent {
 
     private static final BigDecimal MONTHLY_LIVING_COST = new BigDecimal("3000");
 
+    /** 估算收入、DTI、可承受月供和推荐授信额度。 */
     public RepaymentCapacityResult evaluate(LoanApplication application, DocumentIntakeResult documentResult) {
         BigDecimal stableMonthlyIncome = estimateStableMonthlyIncome(application, documentResult);
         BigDecimal monthlyDebtPayment = calculateMonthlyPayment(application);

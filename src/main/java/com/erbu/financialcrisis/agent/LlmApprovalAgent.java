@@ -22,13 +22,13 @@ import java.util.Map;
  * DeepSeek 审批辅助 Agent。
  *
  * <p>该 Agent 只负责对已有结构化风控结果进行解释和交叉审查，不直接替代硬规则做最终放款决定。
- * 当没有配置 API Key、接口调用失败或模型返回不合法 JSON 时，自动沿用本地规则审查结果。</p>
+ * 没有配置 API Key、接口调用失败或模型返回不合法 JSON 时直接中止自动审批，
+ * 由上层编排器将案件转入人工复核，不允许使用本地结果冒充 LLM 结果。</p>
  */
 @Component
 public class LlmApprovalAgent {
 
     private static final String SOURCE = "DEEPSEEK_V4_FLASH";
-    private static final String FALLBACK_SOURCE = "RULE_FALLBACK";
 
     private final ChatLanguageModel chatLanguageModel;
     private final ObjectMapper objectMapper;
@@ -38,7 +38,7 @@ public class LlmApprovalAgent {
 
     public LlmApprovalAgent(ChatLanguageModel chatLanguageModel,
                             ObjectMapper objectMapper,
-                            @Value("${llm.api-key:disabled}") String apiKey,
+                            @Value("${llm.api-key:}") String apiKey,
                             @Value("${llm.model:deepseek-v4-flash}") String modelName,
                             @Value("${llm.enabled:true}") boolean enabled) {
         this.chatLanguageModel = chatLanguageModel;
@@ -48,12 +48,17 @@ public class LlmApprovalAgent {
         this.enabled = enabled;
     }
 
+    /** 调用配置的 DeepSeek 模型复核结构化风险结果；失败时抛出异常并转人工复核。 */
     public PolicyReviewResult review(ApprovalCaseContext context,
                                      FraudRiskResult fraudRiskResult,
                                      RepaymentCapacityResult repaymentResult,
                                      PolicyReviewResult ruleReviewResult) {
         if (!isAvailable()) {
-            return withFallbackSource(ruleReviewResult, "未配置 DeepSeek API Key，使用本地规则审查");
+            throw new IllegalStateException(
+                    enabled
+                            ? "未配置 DeepSeek API Key，严格模式禁止本地规则兜底"
+                            : "DeepSeek 调用已禁用，严格模式禁止继续自动审批"
+            );
         }
 
         try {
@@ -70,9 +75,9 @@ public class LlmApprovalAgent {
             PolicyReviewResult llmReview = objectMapper.readValue(stripCodeFence(content), PolicyReviewResult.class);
             return guardAgainstRuleRelaxation(llmReview, ruleReviewResult);
         } catch (Exception ex) {
-            return withFallbackSource(
-                    ruleReviewResult,
-                    "DeepSeek 调用失败，使用本地规则兜底：" + ex.getClass().getSimpleName()
+            throw new IllegalStateException(
+                    "DeepSeek 调用失败或响应格式不合法，案件必须转人工复核",
+                    ex
             );
         }
     }
@@ -162,23 +167,6 @@ public class LlmApprovalAgent {
                 evidence,
                 summary,
                 SOURCE + ":" + modelName
-        );
-    }
-
-    private PolicyReviewResult withFallbackSource(PolicyReviewResult ruleReviewResult, String reason) {
-        List<String> evidence = new ArrayList<>();
-        if (ruleReviewResult.getEvidence() != null) {
-            evidence.addAll(ruleReviewResult.getEvidence());
-        }
-        evidence.add(reason);
-        return new PolicyReviewResult(
-                ruleReviewResult.getConflictDetected(),
-                ruleReviewResult.getNeedManualReview(),
-                ruleReviewResult.getRecommendedAction(),
-                ruleReviewResult.getConfidence(),
-                evidence,
-                ruleReviewResult.getSummary() + "；" + reason,
-                FALLBACK_SOURCE
         );
     }
 

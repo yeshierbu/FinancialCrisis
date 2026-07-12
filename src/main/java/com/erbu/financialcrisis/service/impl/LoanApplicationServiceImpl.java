@@ -23,8 +23,8 @@ import java.util.UUID;
 /**
  * 贷款申请业务服务实现。
  *
- * <p>第一版按照指导书建议使用内存存储和同步编排，让申请主流程先跑通。
- * 后续接 MySQL 时，create/get/status 三个方法的边界可以保持不变，只把 store 调用替换为 Mapper。</p>
+ * <p>负责申请主表的创建与查询，并通过审批编排服务同步启动多 Agent 审批流程。
+ * 数据由 ApprovalStore 统一持久化到 MySQL。</p>
  */
 @Service
 public class LoanApplicationServiceImpl implements LoanApplicationService {

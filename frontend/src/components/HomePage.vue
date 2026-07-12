@@ -14,7 +14,7 @@
           智能信贷审批系统
         </h1>
         <p class="mt-5 max-w-2xl text-base leading-7 text-gray-600">
-          在线提交贷款申请、上传材料元数据，并通过 Spring Boot 后端的 Agent
+          在线提交贷款申请、上传真实材料图片，并通过 Spring Boot 后端的 Agent
           编排流程完成材料校验、风险分析和审批决策。
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
@@ -90,7 +90,7 @@ const metrics = [
 
 const flow = [
   "创建申请",
-  "材料接收与模拟 OCR",
+  "材料接收与百度千帆 OCR",
   "反欺诈与偿债能力分析",
   "合规决策与报告生成",
 ];

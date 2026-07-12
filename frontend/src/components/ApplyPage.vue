@@ -156,7 +156,7 @@
           <div>
             <h2 class="text-lg font-semibold text-gray-900">上传材料</h2>
             <p class="mt-1 text-sm text-gray-500">
-              当前后端接收材料元数据，不上传真实文件内容。
+              图片将发送至百度千帆 DeepSeek-OCR 识别，原图不会保存在本地数据库。
             </p>
           </div>
           <span
@@ -283,8 +283,8 @@ const documents = reactive([
   {
     type: "ID_CARD_FRONT",
     name: "身份证正面",
-    description: "支持 JPG、PNG、PDF",
-    accept: "image/*,application/pdf",
+    description: "支持 JPG、JPEG、PNG，最大 10MB",
+    accept: "image/jpeg,image/png",
     icon: markRaw(IdCard),
     file: null,
   },
@@ -292,7 +292,7 @@ const documents = reactive([
     type: "ID_CARD_BACK",
     name: "身份证反面",
     description: "用于身份核验",
-    accept: "image/*,application/pdf",
+    accept: "image/jpeg,image/png",
     icon: markRaw(IdCard),
     file: null,
   },
@@ -300,7 +300,7 @@ const documents = reactive([
     type: "BANK_STATEMENT",
     name: "银行流水",
     description: "用于收入能力评估",
-    accept: "image/*,application/pdf",
+    accept: "image/jpeg,image/png",
     icon: markRaw(WalletCards),
     file: null,
   },
@@ -415,13 +415,14 @@ async function handlePrimaryAction() {
     });
 
     for (const doc of documents) {
-      await loanApi.uploadDocument(application.applicationId, {
-        documentType: doc.type,
-        fileName: doc.file.name,
-        fileUrl: `memory://uploads/${application.applicationId}/${encodeURIComponent(doc.file.name)}`,
-        fileSize: doc.file.size,
-        fileHash: `${doc.type}-${doc.file.size}-${doc.file.lastModified}`,
-      });
+      const result = await loanApi.uploadDocument(
+        application.applicationId,
+        doc.type,
+        doc.file,
+      );
+      if (result.ocrStatus !== "SUCCESS") {
+        throw new Error(`${doc.name} OCR 识别失败，请上传清晰的 JPG 或 PNG 图片。`);
+      }
     }
 
     emit("submitted", application.applicationId);

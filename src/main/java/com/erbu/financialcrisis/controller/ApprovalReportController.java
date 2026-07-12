@@ -21,6 +21,7 @@ public class ApprovalReportController {
         this.approvalReportService = approvalReportService;
     }
 
+    /** 查询已结束申请的审批报告。 */
     @GetMapping("/{applicationId}/report")
     public Result<ApprovalReportResponse> getReport(@PathVariable Long applicationId) {
         return Result.success(approvalReportService.getReport(applicationId));

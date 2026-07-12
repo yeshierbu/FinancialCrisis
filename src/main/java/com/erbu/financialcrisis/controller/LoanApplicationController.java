@@ -28,21 +28,25 @@ public class LoanApplicationController {
         this.loanApplicationService = loanApplicationService;
     }
 
+    /** 查询全部贷款申请。 */
     @GetMapping
     public Result<List<LoanApplicationResponse>> listApplications() {
         return Result.success(loanApplicationService.listApplications());
     }
 
+    /** 创建贷款申请并启动自动审批流程。 */
     @PostMapping
     public Result<LoanApplicationResponse> createApplication(@Valid @RequestBody CreateLoanApplicationRequest request) {
         return Result.success(loanApplicationService.createApplication(request));
     }
 
+    /** 根据申请 ID 查询申请详情。 */
     @GetMapping("/{applicationId}")
     public Result<LoanApplicationResponse> getApplication(@PathVariable Long applicationId) {
         return Result.success(loanApplicationService.getApplication(applicationId));
     }
 
+    /** 查询申请当前状态及状态流转时间线。 */
     @GetMapping("/{applicationId}/status")
     public Result<ApplicationStatusResponse> getApplicationStatus(@PathVariable Long applicationId) {
         return Result.success(loanApplicationService.getApplicationStatus(applicationId));

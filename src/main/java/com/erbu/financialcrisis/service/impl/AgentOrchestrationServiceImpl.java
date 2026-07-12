@@ -66,6 +66,10 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
         this.complianceDecisionAgent = complianceDecisionAgent;
     }
 
+    /**
+     * 执行一次完整审批：材料检查、风控、偿债分析、交叉审查、DeepSeek 复核和合规决策。
+     * 任一 Agent 异常都会创建人工复核工单，避免异常情况下自动放款。
+     */
     @Override
     @Transactional
     public void startApprovalFlow(Long applicationId) {
@@ -87,7 +91,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
             DocumentIntakeResult documentResult = runAgent(
                     applicationId,
                     "DocumentIntakeAgent",
-                    "材料完整性校验与模拟 OCR",
+                    "材料完整性与百度千帆 OCR 结果校验",
                     "documents=" + documents.size(),
                     () -> documentIntakeAgent.collectAndParse(application, documents)
             );
@@ -326,6 +330,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
         store.addPolicyHit(hitRecord);
     }
 
+    /** 统一执行 Agent，并记录成功、失败和耗时信息。 */
     private <T> T runAgent(Long applicationId,
                            String agentName,
                            String taskName,

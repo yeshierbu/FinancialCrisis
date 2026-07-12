@@ -20,6 +20,7 @@ import java.util.List;
 @Component
 public class ApprovalCriticAgent {
 
+    /** 交叉检查反欺诈与偿债结论，识别边界风险和结论冲突。 */
     public PolicyReviewResult review(ApprovalCaseContext context,
                                      FraudRiskResult fraudRiskResult,
                                      RepaymentCapacityResult repaymentResult) {

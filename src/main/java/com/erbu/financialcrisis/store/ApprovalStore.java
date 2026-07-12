@@ -12,7 +12,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * MyBatis-backed persistence facade used by the approval services.
+ * 审批数据持久化门面。
+ * 统一封装各 MyBatis Mapper，避免业务层直接组合多张表的读写逻辑。
  */
 @Component
 public class ApprovalStore {
@@ -53,6 +54,7 @@ public class ApprovalStore {
         this.policyHitRecordMapper = policyHitRecordMapper;
     }
 
+    /** 新增或更新贷款申请。 */
     public void saveApplication(LoanApplication application) {
         if (application.getApplicationId() == null) {
             loanApplicationMapper.insert(application);
@@ -74,6 +76,10 @@ public class ApprovalStore {
         return loanApplicationMapper.selectAll();
     }
 
+    /**
+     * 更新申请状态，并同时写入一条状态流转日志。
+     * 调用方应在事务中执行，保证主表状态和审计记录一致。
+     */
     public void changeStatus(LoanApplication application,
                              ApplicationStatus toStatus,
                              String currentStep,
@@ -94,6 +100,7 @@ public class ApprovalStore {
         ));
     }
 
+    /** 保存申请材料元数据。 */
     public void addDocument(UploadedDocument document) {
         uploadedDocumentMapper.insert(document);
     }
@@ -106,6 +113,7 @@ public class ApprovalStore {
         return uploadedDocumentMapper.selectByApplicationId(applicationId);
     }
 
+    /** 按申请维度新增或更新反欺诈结果。 */
     public void saveFraudResult(FraudRiskResult result) {
         if (fraudRiskResultMapper.selectByApplicationId(result.getApplicationId()) == null) {
             fraudRiskResultMapper.insert(result);
@@ -118,6 +126,7 @@ public class ApprovalStore {
         return Optional.ofNullable(fraudRiskResultMapper.selectByApplicationId(applicationId));
     }
 
+    /** 按申请维度新增或更新偿债能力结果。 */
     public void saveRepaymentResult(RepaymentCapacityResult result) {
         if (repaymentCapacityResultMapper.selectByApplicationId(result.getApplicationId()) == null) {
             repaymentCapacityResultMapper.insert(result);
@@ -130,6 +139,7 @@ public class ApprovalStore {
         return Optional.ofNullable(repaymentCapacityResultMapper.selectByApplicationId(applicationId));
     }
 
+    /** 按申请维度新增或更新最终审批决定。 */
     public void saveApprovalDecision(ApprovalDecision decision) {
         ApprovalDecision existing = approvalDecisionMapper.selectByApplicationId(decision.getApplicationId());
         if (existing == null) {
@@ -144,6 +154,7 @@ public class ApprovalStore {
         return Optional.ofNullable(approvalDecisionMapper.selectByApplicationId(applicationId));
     }
 
+    /** 按申请维度新增或更新人工复核工单。 */
     public void saveReviewTicket(ManualReviewTicket ticket) {
         ManualReviewTicket existing = manualReviewTicketMapper.selectByApplicationId(ticket.getApplicationId());
         if (existing == null) {
@@ -162,6 +173,7 @@ public class ApprovalStore {
         return manualReviewTicketMapper.selectPendingList();
     }
 
+    /** 按申请维度新增或更新审批报告。 */
     public void saveApprovalReport(ApprovalReport report) {
         ApprovalReport existing = approvalReportMapper.selectByApplicationId(report.getApplicationId());
         if (existing == null) {
@@ -192,6 +204,7 @@ public class ApprovalStore {
         return toolCallLogMapper.selectByApplicationId(applicationId);
     }
 
+    /** 保存一次 Agent 执行记录，供审计时间线回放。 */
     public void addAgentLog(AgentTaskLog log) {
         agentTaskLogMapper.insert(log);
     }

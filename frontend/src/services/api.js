@@ -66,10 +66,13 @@ export const loanApi = {
     return request(`/api/loan/applications/${applicationId}/status`)
   },
 
-  uploadDocument(applicationId, data) {
+  uploadDocument(applicationId, documentType, file) {
+    const formData = new FormData()
+    formData.append('documentType', documentType)
+    formData.append('file', file)
     return request(`/api/loan/applications/${applicationId}/documents`, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: formData,
     })
   },
 
