@@ -31,14 +31,16 @@ public class DocumentIntakeAgent {
             DocumentType.BANK_STATEMENT
     );
 
+    /** 检查必需材料是否已通过百度千帆 OCR。 */
     public DocumentIntakeResult collectAndParse(LoanApplication application, List<UploadedDocument> documents) {
-        List<DocumentType> uploadedTypes = documents.stream()
+        List<DocumentType> recognizedTypes = documents.stream()
+                .filter(document -> document.getOcrStatus() == OcrStatus.SUCCESS)
                 .map(UploadedDocument::getDocumentType)
                 .distinct()
                 .toList();
 
         List<DocumentType> missingDocuments = REQUIRED_DOCUMENTS.stream()
-                .filter(requiredType -> !uploadedTypes.contains(requiredType))
+                .filter(requiredType -> !recognizedTypes.contains(requiredType))
                 .toList();
 
         if (!missingDocuments.isEmpty()) {
@@ -47,32 +49,16 @@ public class DocumentIntakeAgent {
                     missingDocuments,
                     new BigDecimal("0.30"),
                     true,
-                    "材料不完整，缺失：" + missingDocuments
+                    "材料缺失或 OCR 尚未成功，待处理：" + missingDocuments
             );
-        }
-
-        /*
-         * 第一版不接真实 OCR。这里直接把已上传材料标记为解析成功，并写入可读的模拟 JSON。
-         * 这样前端和审计接口能看到“材料 -> OCR -> 风控”的链路，后续替换成真实 OCR 工具时，
-         * 只需要把这段模拟逻辑移动到 OcrParseTool。
-         */
-        for (UploadedDocument document : documents) {
-            document.setOcrStatus(OcrStatus.SUCCESS);
-            document.setParseResultJson(buildMockParseResult(application, document));
         }
 
         return new DocumentIntakeResult(
                 true,
                 List.of(),
-                new BigDecimal("0.92"),
+                new BigDecimal("0.95"),
                 false,
-                "材料完整，已完成本地模拟 OCR 解析"
+                "材料完整，已通过百度千帆 DeepSeek-OCR 识别"
         );
-    }
-
-    private String buildMockParseResult(LoanApplication application, UploadedDocument document) {
-        return """
-                {"documentType":"%s","applicantName":"%s","parseStatus":"SUCCESS"}
-                """.formatted(document.getDocumentType(), application.getApplicantName()).trim();
     }
 }

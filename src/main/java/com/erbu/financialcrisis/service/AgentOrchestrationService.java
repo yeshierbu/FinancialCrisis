@@ -6,5 +6,6 @@ package com.erbu.financialcrisis.service;
  */
 public interface AgentOrchestrationService {
 
+    /** 按既定顺序执行各专业 Agent，并持久化过程与结果。 */
     void startApprovalFlow(Long applicationId);
 }

@@ -2,7 +2,7 @@
 
 基于 `Spring Boot + Vue 3 + LangChain4j` 的智能信贷审批演示项目。项目围绕“线上贷款申请 -> 材料提交 -> Agent 自动审批 -> 状态追踪 -> 人工复核/审批报告”的主流程搭建，适合用于智能信贷、风控审批、多 Agent 编排、审计留痕等场景的课程设计、项目展示或二次开发。
 
-> 当前版本重点是跑通端到端业务链路：前端提交申请和材料元数据，后端使用本地规则、模拟 OCR 和 DeepSeek 大模型辅助审查完成自动审批编排。数据库、真实文件存储、真实 OCR、征信/反欺诈外部接口和正式鉴权仍属于后续扩展方向。
+> 当前版本重点是跑通端到端业务链路：前端上传申请信息和真实材料图片，后端通过百度千帆 DeepSeek-OCR 提取文字，再使用本地规则和 DeepSeek 大模型完成自动审批编排。原图对象存储、征信/反欺诈外部接口和正式鉴权仍属于后续扩展方向。
 
 ## 项目功能
 
@@ -18,10 +18,10 @@
 ### 后端审批能力
 
 - 申请单管理：创建、查询、列表、状态查询。
-- 材料管理：接收材料元数据，校验文件类型和大小，驱动审批流程继续执行。
+- 材料管理：接收 JPG/PNG 图片，校验文件类型和大小，调用百度千帆 DeepSeek-OCR 后驱动审批流程继续执行。
 - Agent 编排：由 Supervisor 按顺序协调材料采集、反欺诈风控、偿债能力测算、交叉审查和合规决策等 Agent。
 - 多 Agent 协作：通过共享案件上下文传递结构化发现，由 `ApprovalCriticAgent` 检查专业 Agent 之间的边界风险和结论冲突。
-- DeepSeek LLM 审查：材料齐全后调用 `deepseek-v4-flash` 对风险结论进行 JSON 格式复核；没有 API Key 或调用失败时自动回退到本地规则。
+- DeepSeek LLM 审查：材料齐全后调用配置的 DeepSeek 模型对风险结论进行 JSON 格式复核；没有 API Key、调用失败或响应不合法时终止自动审批并转人工复核，不允许本地规则冒充 LLM 结果。
 - 补件判断：材料不完整时进入 `DOCUMENT_PENDING` 状态，等待用户补充材料。
 - 自动审批决策：根据风险规则、DTI、推荐额度等指标输出通过、拒绝或人工复核。
 - 人工复核：支持管理端查询待复核工单，并执行人工通过或拒绝。
@@ -33,7 +33,7 @@
 ```mermaid
 flowchart TD
     A[用户提交贷款申请] --> B[创建申请单]
-    B --> C[DocumentIntakeAgent 材料完整性校验与模拟 OCR]
+    B --> C[百度千帆 DeepSeek-OCR 图片识别]
     C -->|材料缺失| D[DOCUMENT_PENDING 等待补件]
     D --> E[用户补充/上传材料]
     E --> C
@@ -166,12 +166,25 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
 
+ocr:
+  baidu:
+    api-key: ${BAIDU_API_KEY:}
+    base-url: ${BAIDU_OCR_BASE_URL:https://qianfan.baidubce.com/v2}
+    model: ${BAIDU_OCR_MODEL:deepseek-ocr}
+    timeout-seconds: ${BAIDU_OCR_TIMEOUT_SECONDS:60}
+
 llm:
-  api-key: ${DEEPSEEK_API_KEY:disabled}
+  api-key: ${DEEPSEEK_API_KEY:}
   enabled: ${LLM_ENABLED:true}
   base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
   model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
   timeout-seconds: ${LLM_TIMEOUT_SECONDS:45}
+```
+
+身份证和银行流水图片通过 multipart 上传，后端临时转换为 Base64 data URL 调用百度千帆。原图不会写入数据库，数据库只保存文件元数据、SHA-256、OCR 状态和识别文本。运行前必须配置 `BAIDU_API_KEY`：
+
+```bash
+export BAIDU_API_KEY="your-baidu-qianfan-api-key"
 ```
 
 DeepSeek 使用 OpenAI 兼容接口，默认 Base URL 为 `https://api.deepseek.com`，模型为 `deepseek-v4-flash`。正式运行前请在本地环境变量或 IDE Run Configuration 中配置 API Key，不要写入仓库：
@@ -182,19 +195,23 @@ export LLM_ENABLED=true
 mvn spring-boot:run
 ```
 
-模型只在材料齐全、规则 Agent 已完成初步分析后调用。LLM 结果只能升级为人工复核，不能放宽本地规则的硬性拒绝或人工复核结论；API Key 缺失、超时、接口异常或 JSON 解析失败时，系统自动使用本地规则继续审批。
+模型只在材料齐全、规则 Agent 已完成初步分析后调用。LLM 结果不能放宽本地规则的硬性拒绝或人工复核结论；API Key 缺失、超时、接口异常或 JSON 解析失败时，系统终止自动审批并转入人工复核。
 
 可通过环境变量覆盖大模型配置：
 
 | 环境变量 | 说明 |
 | --- | --- |
-| `DEEPSEEK_API_KEY` | DeepSeek API Key，默认不启用真实调用 |
-| `LLM_ENABLED` | 是否启用 LLM 审查，默认 `true`；没有 Key 时自动规则兜底 |
+| `BAIDU_API_KEY` | 百度千帆 API Key，用于 DeepSeek-OCR 鉴权 |
+| `BAIDU_OCR_BASE_URL` | 千帆模型服务地址，默认 `https://qianfan.baidubce.com/v2` |
+| `BAIDU_OCR_MODEL` | OCR 模型，默认且建议保持 `deepseek-ocr` |
+| `BAIDU_OCR_TIMEOUT_SECONDS` | 单张图片 OCR 超时时间，默认 60 秒 |
+| `DEEPSEEK_API_KEY` | DeepSeek API Key；严格模式下必须配置 |
+| `LLM_ENABLED` | 是否启用 LLM 审查，默认 `true`；设为 `false` 时自动审批会转人工复核 |
 | `DEEPSEEK_BASE_URL` | DeepSeek OpenAI 兼容接口地址，默认 `https://api.deepseek.com` |
 | `DEEPSEEK_MODEL` | 模型名称，默认 `deepseek-v4-flash` |
 | `LLM_TIMEOUT_SECONDS` | 单次 LLM 调用超时时间，默认 45 秒 |
 
-`LangChain4jConfig` 负责创建 DeepSeek 兼容的 `ChatLanguageModel`，`LlmApprovalAgent` 负责拼装最小案件上下文、解析 JSON 结果和执行安全降级。
+`LangChain4jConfig` 负责创建 DeepSeek 兼容的 `ChatLanguageModel`，`LlmApprovalAgent` 负责拼装最小案件上下文、解析 JSON 结果并执行严格校验。只有 DeepSeek 返回合法结构化结果时，流程才会继续进入自动决策。
 
 ## API 概览
 
@@ -206,7 +223,7 @@ mvn spring-boot:run
 | `POST` | `/api/loan/applications` | 创建贷款申请 |
 | `GET` | `/api/loan/applications/{applicationId}` | 查询申请详情 |
 | `GET` | `/api/loan/applications/{applicationId}/status` | 查询申请状态和状态时间线 |
-| `POST` | `/api/loan/applications/{applicationId}/documents` | 上传材料元数据 |
+| `POST` | `/api/loan/applications/{applicationId}/documents` | multipart 上传材料图片并执行千帆 OCR |
 | `POST` | `/api/loan/applications/{applicationId}/supplement` | 提交补充材料 |
 | `GET` | `/api/loan/applications/{applicationId}/report` | 查询审批报告 |
 
@@ -240,15 +257,15 @@ mvn spring-boot:run
 - 当前 Agent 协作上下文在一次审批流程内共享，协作结果通过 Agent 任务日志和审计时间线留痕。
 - LLM 调用默认关闭请求/响应日志，避免把申请信息写入普通应用日志；API Key 只从环境变量读取。
 - 贷款申请、材料、状态流转、Agent 日志、风险结果、审批决策、人工复核和审批报告均已接入 Mapper SQL。
-- 文件上传当前只提交材料元数据，不上传真实文件内容。
-- OCR 当前为本地模拟逻辑，材料齐全后会把文档标记为解析成功。
+- 文件上传接收真实 JPG/PNG 内容，但只在 OCR 请求期间保留于内存，不在本地持久化原图。
+- OCR 使用百度千帆 `deepseek-ocr`；识别失败时材料标记为 `FAILED`，不会继续自动审批。
 - 前端登录和个人中心为演示功能，尚未接入真实用户体系。
 - 审批报告当前生成 `memory://approval-reports/...` 形式的模拟地址，尚未导出真实 PDF。
 
 ## 后续扩展方向
 
 - 使用 Flyway 管理数据库版本和初始化数据。
-- 接入真实文件上传、对象存储和 OCR 服务。
+- 如需长期保存原图，接入对象存储并实现加密、访问控制和数据保留策略。
 - 接入征信、黑名单、多头借贷、设备指纹等外部风控数据源。
 - 将规则逻辑抽象为规则引擎或可配置策略。
 - 引入 RAG，用于政策条款检索、审批解释生成和人工复核辅助。

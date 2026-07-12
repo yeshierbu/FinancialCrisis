@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * 合规决策 Agent。
@@ -21,19 +20,7 @@ import java.util.List;
 @Component
 public class ComplianceDecisionAgent {
 
-    public ApprovalDecision decide(LoanApplication application,
-                                   DocumentIntakeResult documentResult,
-                                   FraudRiskResult fraudRiskResult,
-                                   RepaymentCapacityResult repaymentResult) {
-        return decide(
-                application,
-                documentResult,
-                fraudRiskResult,
-                repaymentResult,
-                new PolicyReviewResult(false, false, "PASS", new BigDecimal("0.90"), List.of(), "未启用审查 Agent", "RULE_FALLBACK")
-        );
-    }
-
+    /** 按硬性拒绝、人工复核、自动通过的优先级生成最终审批决定。 */
     public ApprovalDecision decide(LoanApplication application,
                                    DocumentIntakeResult documentResult,
                                    FraudRiskResult fraudRiskResult,

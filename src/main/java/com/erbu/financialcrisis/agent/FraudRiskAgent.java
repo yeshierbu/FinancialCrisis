@@ -18,6 +18,7 @@ import java.util.List;
 @Component
 public class FraudRiskAgent {
 
+    /** 根据申请信息和材料完整性计算风险分数、标签及建议动作。 */
     public FraudRiskResult evaluate(LoanApplication application, DocumentIntakeResult documentResult) {
         List<String> riskTags = new ArrayList<>();
         List<String> ruleHits = new ArrayList<>();

@@ -16,7 +16,7 @@ import java.time.Duration;
 public class LangChain4jConfig {
 
     @Bean
-    public ChatLanguageModel chatLanguageModel(@Value("${llm.api-key:disabled}") String apiKey,
+    public ChatLanguageModel chatLanguageModel(@Value("${llm.api-key:}") String apiKey,
                                                @Value("${llm.base-url:https://api.deepseek.com}") String baseUrl,
                                                @Value("${llm.model:deepseek-v4-flash}") String modelName,
                                                @Value("${llm.timeout-seconds:45}") long timeoutSeconds) {

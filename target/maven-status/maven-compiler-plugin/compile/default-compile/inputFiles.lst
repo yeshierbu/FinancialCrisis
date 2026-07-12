@@ -46,7 +46,6 @@ E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erb
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\dto\request\ManualReviewRequest.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\dto\request\SupplementDocumentRequest.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\dto\request\SupplementRequest.java
-E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\dto\request\UploadDocumentRequest.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\dto\response\ApplicationStatusResponse.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\dto\response\ApprovalReportResponse.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\dto\response\AuditTimelineItemResponse.java
@@ -80,9 +79,11 @@ E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erb
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\impl\AgentOrchestrationServiceImpl.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\impl\ApprovalReportServiceImpl.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\impl\AuditTimelineServiceImpl.java
+E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\impl\BaiduQianfanOcrService.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\impl\DocumentServiceImpl.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\impl\LoanApplicationServiceImpl.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\impl\ManualReviewServiceImpl.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\LoanApplicationService.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\ManualReviewService.java
+E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\service\QianfanOcrService.java
 E:\javaConclusion\智能信贷项目文档\FinancialCrisis\src\main\java\com\erbu\financialcrisis\store\ApprovalStore.java

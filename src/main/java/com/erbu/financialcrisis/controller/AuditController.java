@@ -23,6 +23,7 @@ public class AuditController {
         this.auditTimelineService = auditTimelineService;
     }
 
+    /** 聚合状态、Agent、工具和政策命中记录，生成审批审计时间线。 */
     @GetMapping("/{applicationId}/timeline")
     public Result<AuditTimelineResponse> getTimeline(@PathVariable Long applicationId,
                                                      @ModelAttribute AuditTimelineRequest request) {

@@ -38,14 +38,15 @@ com\erbu\financialcrisis\dto\response\SupplementResponse.class
 com\erbu\financialcrisis\common\Result.class
 com\erbu\financialcrisis\domain\entity\LlmTraceLog.class
 com\erbu\financialcrisis\domain\enums\LogStatus.class
+com\erbu\financialcrisis\service\QianfanOcrService.class
 com\erbu\financialcrisis\domain\entity\FraudRiskResult.class
 com\erbu\financialcrisis\config\GlobalExceptionHandler.class
 com\erbu\financialcrisis\service\impl\ManualReviewServiceImpl.class
 com\erbu\financialcrisis\agent\DocumentIntakeAgent.class
 com\erbu\financialcrisis\dto\response\ManualReviewResponse.class
-com\erbu\financialcrisis\dto\request\UploadDocumentRequest.class
 com\erbu\financialcrisis\dto\response\StatusTimelineResponse.class
 com\erbu\financialcrisis\service\ApprovalReportService.class
+com\erbu\financialcrisis\service\impl\BaiduQianfanOcrService.class
 com\erbu\financialcrisis\agent\FraudRiskAgent.class
 com\erbu\financialcrisis\dto\request\CreateLoanApplicationRequest.class
 com\erbu\financialcrisis\mapper\UploadedDocumentMapper.class
@@ -78,6 +79,7 @@ com\erbu\financialcrisis\mapper\ManualReviewTicketMapper.class
 com\erbu\financialcrisis\domain\entity\ToolCallLog.class
 com\erbu\financialcrisis\mapper\AgentTaskLogMapper.class
 com\erbu\financialcrisis\controller\AdminReviewController.class
+com\erbu\financialcrisis\service\impl\BaiduQianfanOcrService$1.class
 com\erbu\financialcrisis\domain\enums\OperatorType.class
 com\erbu\financialcrisis\domain\entity\ApprovalReport.class
 com\erbu\financialcrisis\mapper\CreditAssessmentMapper.class

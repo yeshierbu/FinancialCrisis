@@ -31,7 +31,7 @@ public class DocumentIntakeResult {
     private List<DocumentType> missingDocuments;
 
     /**
-     * 本地模拟 OCR 的整体置信度。真实 OCR 接入后，这个值应来自 OCR/解析服务的返回。
+     * 材料解析的整体置信度，用于描述当前 OCR 结果的可用程度。
      */
     private BigDecimal parseConfidence;
 

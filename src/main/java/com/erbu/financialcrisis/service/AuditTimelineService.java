@@ -8,5 +8,6 @@ import com.erbu.financialcrisis.dto.response.AuditTimelineResponse;
  */
 public interface AuditTimelineService {
 
+    /** 生成指定申请的完整审计时间线。 */
     AuditTimelineResponse getTimeline(Long applicationId, AuditTimelineRequest request);
 }
