@@ -9,8 +9,9 @@ import com.erbu.financialcrisis.dto.request.AuditTimelineRequest;
 import com.erbu.financialcrisis.dto.response.AuditTimelineItemResponse;
 import com.erbu.financialcrisis.dto.response.AuditTimelineResponse;
 import com.erbu.financialcrisis.service.AuditTimelineService;
-import com.erbu.financialcrisis.store.InMemoryApprovalStore;
+import com.erbu.financialcrisis.store.ApprovalStore;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -26,13 +27,14 @@ import java.util.List;
 @Service
 public class AuditTimelineServiceImpl implements AuditTimelineService {
 
-    private final InMemoryApprovalStore store;
+    private final ApprovalStore store;
 
-    public AuditTimelineServiceImpl(InMemoryApprovalStore store) {
+    public AuditTimelineServiceImpl(ApprovalStore store) {
         this.store = store;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public AuditTimelineResponse getTimeline(Long applicationId, AuditTimelineRequest request) {
         LoanApplication application = store.getApplicationOrThrow(applicationId);
         boolean includeRawPayload = request != null && Boolean.TRUE.equals(request.getIncludeRawPayload());

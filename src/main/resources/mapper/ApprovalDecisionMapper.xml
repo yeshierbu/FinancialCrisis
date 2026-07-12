@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.ApprovalDecisionMapper">
+    <sql id="columns">
+        id, application_id, decision_result, approved_amount, interest_rate, loan_term,
+        reject_reason_code, decision_explanation, policy_references_json, decided_by,
+        decided_at, created_at, updated_at
+    </sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO approval_decision
+        (application_id, decision_result, approved_amount, interest_rate, loan_term, reject_reason_code,
+         decision_explanation, policy_references_json, decided_by, decided_at, created_at, updated_at)
+        VALUES
+        (#{applicationId}, #{decisionResult}, #{approvedAmount}, #{interestRate}, #{loanTerm}, #{rejectReasonCode},
+         #{decisionExplanation}, #{policyReferencesJson}, #{decidedBy}, #{decidedAt}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateByApplicationId">
+        UPDATE approval_decision SET decision_result=#{decisionResult}, approved_amount=#{approvedAmount},
+        interest_rate=#{interestRate}, loan_term=#{loanTerm}, reject_reason_code=#{rejectReasonCode},
+        decision_explanation=#{decisionExplanation}, policy_references_json=#{policyReferencesJson},
+        decided_by=#{decidedBy}, decided_at=#{decidedAt}, updated_at=#{updatedAt}
+        WHERE application_id=#{applicationId}
+    </update>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.ApprovalDecision">
+        SELECT <include refid="columns"/> FROM approval_decision WHERE application_id=#{applicationId} ORDER BY id DESC LIMIT 1
+    </select>
+    <delete id="deleteByApplicationId">DELETE FROM approval_decision WHERE application_id=#{applicationId}</delete>
+</mapper>

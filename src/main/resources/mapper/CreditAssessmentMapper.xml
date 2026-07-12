@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.CreditAssessmentMapper">
+    <sql id="columns">id, application_id, credit_score, total_liability, overdue_count, credit_card_utilization, loan_account_count, external_report_no, assessment_time, created_at, updated_at</sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO credit_assessment (application_id, credit_score, total_liability, overdue_count, credit_card_utilization, loan_account_count, external_report_no, assessment_time, created_at, updated_at)
+        VALUES (#{applicationId}, #{creditScore}, #{totalLiability}, #{overdueCount}, #{creditCardUtilization}, #{loanAccountCount}, #{externalReportNo}, #{assessmentTime}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateByApplicationId">
+        UPDATE credit_assessment SET credit_score=#{creditScore}, total_liability=#{totalLiability}, overdue_count=#{overdueCount}, credit_card_utilization=#{creditCardUtilization}, loan_account_count=#{loanAccountCount}, external_report_no=#{externalReportNo}, assessment_time=#{assessmentTime}, updated_at=#{updatedAt} WHERE application_id=#{applicationId}
+    </update>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.CreditAssessment">
+        SELECT <include refid="columns"/> FROM credit_assessment WHERE application_id=#{applicationId} ORDER BY id DESC LIMIT 1
+    </select>
+    <delete id="deleteByApplicationId">DELETE FROM credit_assessment WHERE application_id=#{applicationId}</delete>
+</mapper>

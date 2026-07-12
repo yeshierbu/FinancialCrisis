@@ -2,10 +2,10 @@ spring:
   application:
     name: financial-crisis
   datasource:
-    url: jdbc:h2:mem:financial_crisis;MODE=MySQL;DATABASE_TO_LOWER=TRUE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/financical?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:yseb2260602581}
 
 server:
   port: 8080
@@ -17,6 +17,7 @@ management:
         include: health,info
 
 mybatis:
+  mapper-locations: classpath:/mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
 

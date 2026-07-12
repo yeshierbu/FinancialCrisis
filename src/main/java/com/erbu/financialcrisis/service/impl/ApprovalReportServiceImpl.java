@@ -7,8 +7,9 @@ import com.erbu.financialcrisis.domain.enums.ApplicationStatus;
 import com.erbu.financialcrisis.domain.enums.ReportType;
 import com.erbu.financialcrisis.dto.response.ApprovalReportResponse;
 import com.erbu.financialcrisis.service.ApprovalReportService;
-import com.erbu.financialcrisis.store.InMemoryApprovalStore;
+import com.erbu.financialcrisis.store.ApprovalStore;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -21,13 +22,14 @@ import java.time.LocalDateTime;
 @Service
 public class ApprovalReportServiceImpl implements ApprovalReportService {
 
-    private final InMemoryApprovalStore store;
+    private final ApprovalStore store;
 
-    public ApprovalReportServiceImpl(InMemoryApprovalStore store) {
+    public ApprovalReportServiceImpl(ApprovalStore store) {
         this.store = store;
     }
 
     @Override
+    @Transactional
     public ApprovalReportResponse getReport(Long applicationId) {
         LoanApplication application = store.getApplicationOrThrow(applicationId);
         if (application.getStatus() != ApplicationStatus.APPROVED
@@ -49,7 +51,7 @@ public class ApprovalReportServiceImpl implements ApprovalReportService {
     private ApprovalReport createReport(LoanApplication application) {
         LocalDateTime now = LocalDateTime.now();
         return new ApprovalReport(
-                store.nextReportId(),
+                null,
                 application.getApplicationId(),
                 ReportType.INTERNAL_AUDIT,
                 "memory://approval-reports/" + application.getApplicationNo() + "/v1.json",

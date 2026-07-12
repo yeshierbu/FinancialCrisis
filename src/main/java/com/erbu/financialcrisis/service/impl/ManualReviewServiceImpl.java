@@ -17,8 +17,9 @@ import com.erbu.financialcrisis.dto.response.ManualReviewDetailResponse;
 import com.erbu.financialcrisis.dto.response.ManualReviewPendingResponse;
 import com.erbu.financialcrisis.dto.response.ManualReviewResponse;
 import com.erbu.financialcrisis.service.ManualReviewService;
-import com.erbu.financialcrisis.store.InMemoryApprovalStore;
+import com.erbu.financialcrisis.store.ApprovalStore;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,9 +34,9 @@ import java.util.List;
 @Service
 public class ManualReviewServiceImpl implements ManualReviewService {
 
-    private final InMemoryApprovalStore store;
+    private final ApprovalStore store;
 
-    public ManualReviewServiceImpl(InMemoryApprovalStore store) {
+    public ManualReviewServiceImpl(ApprovalStore store) {
         this.store = store;
     }
 
@@ -77,6 +78,7 @@ public class ManualReviewServiceImpl implements ManualReviewService {
     }
 
     @Override
+    @Transactional
     public ManualReviewResponse approve(Long applicationId, ManualReviewRequest request) {
         LoanApplication application = ensureManualReviewApplication(applicationId);
         ManualReviewTicket ticket = getOrCreateTicket(application);
@@ -118,6 +120,7 @@ public class ManualReviewServiceImpl implements ManualReviewService {
     }
 
     @Override
+    @Transactional
     public ManualReviewResponse reject(Long applicationId, ManualReviewRequest request) {
         LoanApplication application = ensureManualReviewApplication(applicationId);
         ManualReviewTicket ticket = getOrCreateTicket(application);
@@ -187,7 +190,7 @@ public class ManualReviewServiceImpl implements ManualReviewService {
         return store.findReviewTicket(application.getApplicationId()).orElseGet(() -> {
             LocalDateTime now = LocalDateTime.now();
             return new ManualReviewTicket(
-                    store.nextTicketId(),
+                    null,
                     application.getApplicationId(),
                     "MR-" + application.getApplicationNo(),
                     ReviewStatus.PENDING,
@@ -205,7 +208,7 @@ public class ManualReviewServiceImpl implements ManualReviewService {
     private Long resolveDecisionId(Long applicationId) {
         return store.findApprovalDecision(applicationId)
                 .map(ApprovalDecision::getId)
-                .orElseGet(store::nextDecisionId);
+                .orElse(null);
     }
 
     private BigDecimal defaultApprovedAmount(LoanApplication application) {

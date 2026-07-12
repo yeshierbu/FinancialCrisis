@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.FraudRiskResultMapper">
+    <sql id="columns">
+        id, application_id, risk_level, risk_score, risk_tags_json, rule_hits_json,
+        suggested_action, created_at, updated_at
+    </sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO fraud_risk_result
+        (application_id, risk_level, risk_score, risk_tags_json, rule_hits_json, suggested_action, created_at, updated_at)
+        VALUES
+        (#{applicationId}, #{riskLevel}, #{riskScore}, #{riskTagsJson}, #{ruleHitsJson}, #{suggestedAction}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateByApplicationId">
+        UPDATE fraud_risk_result SET risk_level=#{riskLevel}, risk_score=#{riskScore}, risk_tags_json=#{riskTagsJson},
+        rule_hits_json=#{ruleHitsJson}, suggested_action=#{suggestedAction}, updated_at=#{updatedAt}
+        WHERE application_id=#{applicationId}
+    </update>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.FraudRiskResult">
+        SELECT <include refid="columns"/> FROM fraud_risk_result WHERE application_id=#{applicationId} ORDER BY id DESC LIMIT 1
+    </select>
+    <delete id="deleteByApplicationId">DELETE FROM fraud_risk_result WHERE application_id=#{applicationId}</delete>
+</mapper>

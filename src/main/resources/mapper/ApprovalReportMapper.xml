@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.ApprovalReportMapper">
+    <sql id="columns">
+        id AS report_id, application_id, report_type, report_url, report_version,
+        generated_by, generated_at, created_at, updated_at
+    </sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="reportId" keyColumn="id">
+        INSERT INTO approval_report
+        (application_id, report_type, report_url, report_version, generated_by, generated_at, created_at, updated_at)
+        VALUES
+        (#{applicationId}, #{reportType}, #{reportUrl}, #{reportVersion}, #{generatedBy}, #{generatedAt}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateByApplicationId">
+        UPDATE approval_report SET report_type=#{reportType}, report_url=#{reportUrl}, report_version=#{reportVersion},
+        generated_by=#{generatedBy}, generated_at=#{generatedAt}, updated_at=#{updatedAt}
+        WHERE application_id=#{applicationId}
+    </update>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.ApprovalReport">
+        SELECT <include refid="columns"/> FROM approval_report WHERE application_id=#{applicationId} ORDER BY id DESC LIMIT 1
+    </select>
+    <delete id="deleteByApplicationId">DELETE FROM approval_report WHERE application_id=#{applicationId}</delete>
+</mapper>

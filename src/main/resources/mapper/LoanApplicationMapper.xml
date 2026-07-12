@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.LoanApplicationMapper">
+    <sql id="columns">
+        id AS application_id, application_no, product_code, applicant_name, id_card_no, mobile,
+        loan_amount, loan_term, employment_type, company_name, work_years, status, current_step,
+        channel_code, created_at, updated_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="applicationId" keyColumn="id">
+        INSERT INTO loan_application
+        (application_no, product_code, applicant_name, id_card_no, mobile, loan_amount, loan_term,
+         employment_type, company_name, work_years, status, current_step, channel_code, created_at, updated_at)
+        VALUES
+        (#{applicationNo}, #{productCode}, #{applicantName}, #{idCardNo}, #{mobile}, #{loanAmount}, #{loanTerm},
+         #{employmentType}, #{companyName}, #{workYears}, #{status}, #{currentStep}, #{channelCode}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="updateByApplicationId">
+        UPDATE loan_application SET
+        application_no=#{applicationNo}, product_code=#{productCode}, applicant_name=#{applicantName},
+        id_card_no=#{idCardNo}, mobile=#{mobile}, loan_amount=#{loanAmount}, loan_term=#{loanTerm},
+        employment_type=#{employmentType}, company_name=#{companyName}, work_years=#{workYears},
+        status=#{status}, current_step=#{currentStep}, channel_code=#{channelCode}, updated_at=#{updatedAt}
+        WHERE id=#{applicationId}
+    </update>
+
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.LoanApplication">
+        SELECT <include refid="columns"/> FROM loan_application WHERE id=#{applicationId}
+    </select>
+
+    <select id="selectAll" resultType="com.erbu.financialcrisis.domain.entity.LoanApplication">
+        SELECT <include refid="columns"/> FROM loan_application ORDER BY created_at DESC, id DESC
+    </select>
+
+    <delete id="deleteByApplicationId">DELETE FROM loan_application WHERE id=#{applicationId}</delete>
+</mapper>

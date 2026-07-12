@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.PolicyHitRecordMapper">
+    <sql id="columns">id, application_id, policy_id, clause_id, policy_title, clause_text, hit_source, created_at</sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO policy_hit_record
+        (application_id, policy_id, clause_id, policy_title, clause_text, hit_source, created_at)
+        VALUES (#{applicationId}, #{policyId}, #{clauseId}, #{policyTitle}, #{clauseText}, #{hitSource}, #{createdAt})
+    </insert>
+    <update id="updateById">
+        UPDATE policy_hit_record SET application_id=#{applicationId}, policy_id=#{policyId}, clause_id=#{clauseId},
+        policy_title=#{policyTitle}, clause_text=#{clauseText}, hit_source=#{hitSource} WHERE id=#{id}
+    </update>
+    <select id="selectById" resultType="com.erbu.financialcrisis.domain.entity.PolicyHitRecord">
+        SELECT <include refid="columns"/> FROM policy_hit_record WHERE id=#{id}
+    </select>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.PolicyHitRecord">
+        SELECT <include refid="columns"/> FROM policy_hit_record WHERE application_id=#{applicationId} ORDER BY created_at, id
+    </select>
+    <delete id="deleteById">DELETE FROM policy_hit_record WHERE id=#{id}</delete>
+</mapper>

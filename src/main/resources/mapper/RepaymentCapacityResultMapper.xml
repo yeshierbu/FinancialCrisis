@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.RepaymentCapacityResultMapper">
+    <sql id="columns">
+        id, application_id, stable_monthly_income, monthly_debt_payment, dti, foir,
+        disposable_income, income_stability_score, max_affordable_emi, recommended_credit_limit,
+        created_at, updated_at
+    </sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO repayment_capacity_result
+        (application_id, stable_monthly_income, monthly_debt_payment, dti, foir, disposable_income,
+         income_stability_score, max_affordable_emi, recommended_credit_limit, created_at, updated_at)
+        VALUES
+        (#{applicationId}, #{stableMonthlyIncome}, #{monthlyDebtPayment}, #{dti}, #{foir}, #{disposableIncome},
+         #{incomeStabilityScore}, #{maxAffordableEmi}, #{recommendedCreditLimit}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateByApplicationId">
+        UPDATE repayment_capacity_result SET stable_monthly_income=#{stableMonthlyIncome},
+        monthly_debt_payment=#{monthlyDebtPayment}, dti=#{dti}, foir=#{foir}, disposable_income=#{disposableIncome},
+        income_stability_score=#{incomeStabilityScore}, max_affordable_emi=#{maxAffordableEmi},
+        recommended_credit_limit=#{recommendedCreditLimit}, updated_at=#{updatedAt}
+        WHERE application_id=#{applicationId}
+    </update>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.RepaymentCapacityResult">
+        SELECT <include refid="columns"/> FROM repayment_capacity_result WHERE application_id=#{applicationId} ORDER BY id DESC LIMIT 1
+    </select>
+    <delete id="deleteByApplicationId">DELETE FROM repayment_capacity_result WHERE application_id=#{applicationId}</delete>
+</mapper>

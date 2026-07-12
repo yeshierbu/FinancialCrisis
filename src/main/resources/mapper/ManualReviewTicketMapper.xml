@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.ManualReviewTicketMapper">
+    <sql id="columns">
+        id AS ticket_id, application_id, ticket_no, review_status, assigned_to, trigger_reason,
+        risk_summary, review_comment, reviewed_at, created_at, updated_at
+    </sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="ticketId" keyColumn="id">
+        INSERT INTO manual_review_ticket
+        (application_id, ticket_no, review_status, assigned_to, trigger_reason, risk_summary,
+         review_comment, reviewed_at, created_at, updated_at)
+        VALUES
+        (#{applicationId}, #{ticketNo}, #{reviewStatus}, #{assignedTo}, #{triggerReason}, #{riskSummary},
+         #{reviewComment}, #{reviewedAt}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateByApplicationId">
+        UPDATE manual_review_ticket SET ticket_no=#{ticketNo}, review_status=#{reviewStatus}, assigned_to=#{assignedTo},
+        trigger_reason=#{triggerReason}, risk_summary=#{riskSummary}, review_comment=#{reviewComment},
+        reviewed_at=#{reviewedAt}, updated_at=#{updatedAt} WHERE application_id=#{applicationId}
+    </update>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.ManualReviewTicket">
+        SELECT <include refid="columns"/> FROM manual_review_ticket WHERE application_id=#{applicationId} ORDER BY id DESC LIMIT 1
+    </select>
+    <select id="selectPendingList" resultType="com.erbu.financialcrisis.domain.entity.ManualReviewTicket">
+        SELECT <include refid="columns"/> FROM manual_review_ticket WHERE review_status='PENDING' ORDER BY created_at, id
+    </select>
+    <delete id="deleteByApplicationId">DELETE FROM manual_review_ticket WHERE application_id=#{applicationId}</delete>
+</mapper>

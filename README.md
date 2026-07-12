@@ -58,8 +58,8 @@ flowchart TD
 | Spring Web | REST API 接口 |
 | Spring Validation | 请求参数校验 |
 | LangChain4j 0.35.0 | 大模型/Agent 能力扩展基础配置 |
-| MyBatis Spring Boot Starter 3.0.3 | Mapper 层预留，便于后续切换数据库持久化 |
-| H2 Database | 内存数据库依赖与开发配置 |
+| MyBatis Spring Boot Starter 3.0.3 | 业务数据的 Mapper 持久化层 |
+| MySQL 8 | 贷款申请、审批结果和审计日志的持久化数据库 |
 | Lombok | 简化实体、DTO 样板代码 |
 | Spring Boot Actuator | 健康检查与基础监控端点 |
 | Maven | 后端依赖管理和构建工具 |
@@ -89,9 +89,9 @@ FinancialCrisis
 │   │   │   ├── controller          # 用户端和管理端 REST API
 │   │   │   ├── domain              # 实体与枚举
 │   │   │   ├── dto                 # 请求/响应 DTO
-│   │   │   ├── mapper              # MyBatis Mapper 预留层
+│   │   │   ├── mapper              # MyBatis Mapper 接口
 │   │   │   ├── service             # 业务接口与实现
-│   │   │   └── store               # 当前版本的内存数据中心
+│   │   │   └── store               # 数据库持久化门面
 │   │   └── resources
 │   │       └── application.yml     # 后端端口、数据源、LLM 配置
 │   └── test                        # 后端测试
@@ -162,7 +162,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:h2:mem:financial_crisis;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    url: ${DB_URL:jdbc:mysql://localhost:3306/financical}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
 
 llm:
   api-key: ${DEEPSEEK_API_KEY:disabled}
@@ -234,10 +236,10 @@ mvn spring-boot:run
 
 ## 当前版本说明
 
-- 当前后端核心数据保存在 `InMemoryApprovalStore` 中，应用重启后数据会清空。
+- 当前后端核心数据通过 MyBatis 保存在 MySQL 的 `financical` 数据库中，应用重启后数据仍然保留。
 - 当前 Agent 协作上下文在一次审批流程内共享，协作结果通过 Agent 任务日志和审计时间线留痕。
 - LLM 调用默认关闭请求/响应日志，避免把申请信息写入普通应用日志；API Key 只从环境变量读取。
-- 项目中已经存在实体、枚举和 Mapper 层，为后续迁移到 MySQL/MyBatis 持久化做了结构预留。
+- 贷款申请、材料、状态流转、Agent 日志、风险结果、审批决策、人工复核和审批报告均已接入 Mapper SQL。
 - 文件上传当前只提交材料元数据，不上传真实文件内容。
 - OCR 当前为本地模拟逻辑，材料齐全后会把文档标记为解析成功。
 - 前端登录和个人中心为演示功能，尚未接入真实用户体系。
@@ -245,8 +247,7 @@ mvn spring-boot:run
 
 ## 后续扩展方向
 
-- 接入 MySQL，替换内存仓库为真实持久化存储。
-- 增加数据库建表脚本、初始化数据和事务控制。
+- 使用 Flyway 管理数据库版本和初始化数据。
 - 接入真实文件上传、对象存储和 OCR 服务。
 - 接入征信、黑名单、多头借贷、设备指纹等外部风控数据源。
 - 将规则逻辑抽象为规则引擎或可配置策略。

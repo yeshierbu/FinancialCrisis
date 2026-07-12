@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.StateTransitionLogMapper">
+    <sql id="columns">
+        id AS log_id, application_id, from_status, to_status, trigger_event, operator_type,
+        operator_name, remark, created_at
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="logId" keyColumn="id">
+        INSERT INTO state_transition_log
+        (application_id, from_status, to_status, trigger_event, operator_type, operator_name, remark, created_at)
+        VALUES
+        (#{applicationId}, #{fromStatus}, #{toStatus}, #{triggerEvent}, #{operatorType}, #{operatorName}, #{remark}, #{createdAt})
+    </insert>
+    <update id="updateByLogId">
+        UPDATE state_transition_log SET application_id=#{applicationId}, from_status=#{fromStatus},
+        to_status=#{toStatus}, trigger_event=#{triggerEvent}, operator_type=#{operatorType},
+        operator_name=#{operatorName}, remark=#{remark}, created_at=#{createdAt} WHERE id=#{logId}
+    </update>
+    <select id="selectByLogId" resultType="com.erbu.financialcrisis.domain.entity.StateTransitionLog">
+        SELECT <include refid="columns"/> FROM state_transition_log WHERE id=#{logId}
+    </select>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.StateTransitionLog">
+        SELECT <include refid="columns"/> FROM state_transition_log WHERE application_id=#{applicationId} ORDER BY created_at, id
+    </select>
+    <delete id="deleteByLogId">DELETE FROM state_transition_log WHERE id=#{logId}</delete>
+</mapper>

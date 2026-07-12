@@ -13,12 +13,14 @@ import com.erbu.financialcrisis.dto.response.SupplementResponse;
 import com.erbu.financialcrisis.dto.response.UploadedDocumentResponse;
 import com.erbu.financialcrisis.service.AgentOrchestrationService;
 import com.erbu.financialcrisis.service.DocumentService;
-import com.erbu.financialcrisis.store.InMemoryApprovalStore;
+import com.erbu.financialcrisis.store.ApprovalStore;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * 申请材料业务服务实现。
@@ -32,23 +34,24 @@ public class DocumentServiceImpl implements DocumentService {
     private static final long MAX_FILE_SIZE = 20L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".pdf");
 
-    private final InMemoryApprovalStore store;
+    private final ApprovalStore store;
     private final AgentOrchestrationService agentOrchestrationService;
 
-    public DocumentServiceImpl(InMemoryApprovalStore store,
+    public DocumentServiceImpl(ApprovalStore store,
                                AgentOrchestrationService agentOrchestrationService) {
         this.store = store;
         this.agentOrchestrationService = agentOrchestrationService;
     }
 
     @Override
+    @Transactional
     public UploadedDocumentResponse uploadDocument(Long applicationId, UploadDocumentRequest request) {
         LoanApplication application = store.getApplicationOrThrow(applicationId);
         assertDocumentUploadAllowed(application);
         validateFile(request.getFileName(), request.getFileSize());
 
         UploadedDocument document = new UploadedDocument(
-                store.nextDocumentId(),
+                null,
                 applicationId,
                 request.getDocumentType(),
                 request.getFileName(),
@@ -85,6 +88,7 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
+    @Transactional
     public SupplementResponse submitSupplement(Long applicationId, SupplementRequest request) {
         LoanApplication application = store.getApplicationOrThrow(applicationId);
         if (application.getStatus() != ApplicationStatus.DOCUMENT_PENDING
@@ -93,15 +97,15 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         for (SupplementDocumentRequest documentRequest : request.getDocuments()) {
-            Long documentId = store.nextDocumentId();
+            String documentKey = UUID.randomUUID().toString().replace("-", "");
             UploadedDocument document = new UploadedDocument(
-                    documentId,
+                    null,
                     applicationId,
                     documentRequest.getDocumentType(),
-                    buildSupplementFileName(documentId, documentRequest),
+                    buildSupplementFileName(documentKey, documentRequest),
                     documentRequest.getFileUrl(),
                     null,
-                    "SUP-" + documentId,
+                    "SUP-" + documentKey,
                     OcrStatus.PENDING,
                     null,
                     LocalDateTime.now()
@@ -144,12 +148,12 @@ public class DocumentServiceImpl implements DocumentService {
         }
     }
 
-    private String buildSupplementFileName(Long documentId, SupplementDocumentRequest request) {
+    private String buildSupplementFileName(String documentKey, SupplementDocumentRequest request) {
         String fileUrl = request.getFileUrl();
         int slashIndex = fileUrl.lastIndexOf('/');
         if (slashIndex >= 0 && slashIndex < fileUrl.length() - 1) {
             return fileUrl.substring(slashIndex + 1);
         }
-        return request.getDocumentType() + "-supplement-" + documentId + ".pdf";
+        return request.getDocumentType() + "-supplement-" + documentKey + ".pdf";
     }
 }

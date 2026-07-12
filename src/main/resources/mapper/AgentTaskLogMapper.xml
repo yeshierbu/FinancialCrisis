@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.AgentTaskLogMapper">
+    <sql id="columns">
+        id AS log_id, application_id, agent_name, task_name, input_summary, output_summary,
+        status, duration_ms, error_message, started_at, finished_at, created_at
+    </sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="logId" keyColumn="id">
+        INSERT INTO agent_task_log
+        (application_id, agent_name, task_name, input_summary, output_summary, status, duration_ms,
+         error_message, started_at, finished_at, created_at)
+        VALUES
+        (#{applicationId}, #{agentName}, #{taskName}, #{inputSummary}, #{outputSummary}, #{status}, #{durationMs},
+         #{errorMessage}, #{startedAt}, #{finishedAt}, #{createdAt})
+    </insert>
+    <update id="updateByLogId">
+        UPDATE agent_task_log SET application_id=#{applicationId}, agent_name=#{agentName}, task_name=#{taskName},
+        input_summary=#{inputSummary}, output_summary=#{outputSummary}, status=#{status}, duration_ms=#{durationMs},
+        error_message=#{errorMessage}, started_at=#{startedAt}, finished_at=#{finishedAt} WHERE id=#{logId}
+    </update>
+    <select id="selectByLogId" resultType="com.erbu.financialcrisis.domain.entity.AgentTaskLog">
+        SELECT <include refid="columns"/> FROM agent_task_log WHERE id=#{logId}
+    </select>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.AgentTaskLog">
+        SELECT <include refid="columns"/> FROM agent_task_log WHERE application_id=#{applicationId} ORDER BY created_at, id
+    </select>
+    <delete id="deleteByLogId">DELETE FROM agent_task_log WHERE id=#{logId}</delete>
+</mapper>

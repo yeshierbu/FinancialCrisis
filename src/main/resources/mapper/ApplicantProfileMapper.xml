@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.ApplicantProfileMapper">
+    <sql id="columns">id, application_id, gender, birth_date, address, marital_status, education_level, occupation, employer_name, annual_income, created_at, updated_at</sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO applicant_profile (application_id, gender, birth_date, address, marital_status, education_level, occupation, employer_name, annual_income, created_at, updated_at)
+        VALUES (#{applicationId}, #{gender}, #{birthDate}, #{address}, #{maritalStatus}, #{educationLevel}, #{occupation}, #{employerName}, #{annualIncome}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateByApplicationId">
+        UPDATE applicant_profile SET gender=#{gender}, birth_date=#{birthDate}, address=#{address}, marital_status=#{maritalStatus}, education_level=#{educationLevel}, occupation=#{occupation}, employer_name=#{employerName}, annual_income=#{annualIncome}, updated_at=#{updatedAt} WHERE application_id=#{applicationId}
+    </update>
+    <select id="selectByApplicationId" resultType="com.erbu.financialcrisis.domain.entity.ApplicantProfile">
+        SELECT <include refid="columns"/> FROM applicant_profile WHERE application_id=#{applicationId} ORDER BY id DESC LIMIT 1
+    </select>
+    <delete id="deleteByApplicationId">DELETE FROM applicant_profile WHERE application_id=#{applicationId}</delete>
+</mapper>

@@ -24,8 +24,9 @@ import com.erbu.financialcrisis.domain.enums.LogStatus;
 import com.erbu.financialcrisis.domain.enums.OperatorType;
 import com.erbu.financialcrisis.domain.enums.ReviewStatus;
 import com.erbu.financialcrisis.service.AgentOrchestrationService;
-import com.erbu.financialcrisis.store.InMemoryApprovalStore;
+import com.erbu.financialcrisis.store.ApprovalStore;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -41,7 +42,7 @@ import java.util.function.Supplier;
 @Service
 public class AgentOrchestrationServiceImpl implements AgentOrchestrationService {
 
-    private final InMemoryApprovalStore store;
+    private final ApprovalStore store;
     private final DocumentIntakeAgent documentIntakeAgent;
     private final FraudRiskAgent fraudRiskAgent;
     private final RepaymentCapacityAgent repaymentCapacityAgent;
@@ -49,7 +50,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
     private final LlmApprovalAgent llmApprovalAgent;
     private final ComplianceDecisionAgent complianceDecisionAgent;
 
-    public AgentOrchestrationServiceImpl(InMemoryApprovalStore store,
+    public AgentOrchestrationServiceImpl(ApprovalStore store,
                                          DocumentIntakeAgent documentIntakeAgent,
                                          FraudRiskAgent fraudRiskAgent,
                                          RepaymentCapacityAgent repaymentCapacityAgent,
@@ -66,6 +67,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
     }
 
     @Override
+    @Transactional
     public void startApprovalFlow(Long applicationId) {
         LoanApplication application = store.getApplicationOrThrow(applicationId);
         ApprovalCaseContext context = new ApprovalCaseContext(applicationId);
@@ -89,6 +91,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     "documents=" + documents.size(),
                     () -> documentIntakeAgent.collectAndParse(application, documents)
             );
+            documents.forEach(store::updateDocument);
             context.addFinding(new AgentFinding(
                     "DocumentIntakeAgent",
                     "材料采集",
@@ -128,7 +131,6 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     application.getApplicationNo(),
                     () -> fraudRiskAgent.evaluate(application, documentResult)
             );
-            fraudRiskResult.setId(store.nextFraudResultId());
             store.saveFraudResult(fraudRiskResult);
             context.addFinding(new AgentFinding(
                     "FraudRiskAgent",
@@ -146,7 +148,6 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     application.getLoanAmount().toPlainString(),
                     () -> repaymentCapacityAgent.evaluate(application, documentResult)
             );
-            repaymentResult.setId(store.nextRepaymentResultId());
             store.saveRepaymentResult(repaymentResult);
             context.addFinding(new AgentFinding(
                     "RepaymentCapacityAgent",
@@ -216,7 +217,6 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                             llmReviewResult
                     )
             );
-            decision.setId(store.nextDecisionId());
             store.saveApprovalDecision(decision);
             addPolicyHit(applicationId, decision);
             finishByDecision(application, decision, fraudRiskResult);
@@ -293,7 +293,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
         LocalDateTime now = LocalDateTime.now();
         ManualReviewTicket ticket = store.findReviewTicket(application.getApplicationId())
                 .orElseGet(() -> new ManualReviewTicket(
-                        store.nextTicketId(),
+                        null,
                         application.getApplicationId(),
                         "MR-" + application.getApplicationNo(),
                         ReviewStatus.PENDING,
@@ -314,7 +314,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
 
     private void addPolicyHit(Long applicationId, ApprovalDecision decision) {
         PolicyHitRecord hitRecord = new PolicyHitRecord(
-                store.nextPolicyHitId(),
+                null,
                 applicationId,
                 "POLICY_CONSUMER_LOAN_001",
                 "AUTO_APPROVAL_BOUNDARY",
@@ -336,7 +336,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
             T output = supplier.get();
             LocalDateTime finishedAt = LocalDateTime.now();
             store.addAgentLog(new AgentTaskLog(
-                    store.nextAgentLogId(),
+                    null,
                     applicationId,
                     agentName,
                     taskName,
@@ -353,7 +353,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
         } catch (RuntimeException ex) {
             LocalDateTime finishedAt = LocalDateTime.now();
             store.addAgentLog(new AgentTaskLog(
-                    store.nextAgentLogId(),
+                    null,
                     applicationId,
                     agentName,
                     taskName,

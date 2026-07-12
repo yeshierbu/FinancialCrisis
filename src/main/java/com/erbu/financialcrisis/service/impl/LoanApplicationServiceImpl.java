@@ -10,13 +10,15 @@ import com.erbu.financialcrisis.dto.response.LoanApplicationResponse;
 import com.erbu.financialcrisis.dto.response.StatusTimelineResponse;
 import com.erbu.financialcrisis.service.AgentOrchestrationService;
 import com.erbu.financialcrisis.service.LoanApplicationService;
-import com.erbu.financialcrisis.store.InMemoryApprovalStore;
+import com.erbu.financialcrisis.store.ApprovalStore;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 贷款申请业务服务实现。
@@ -27,23 +29,23 @@ import java.util.List;
 @Service
 public class LoanApplicationServiceImpl implements LoanApplicationService {
 
-    private final InMemoryApprovalStore store;
+    private final ApprovalStore store;
     private final AgentOrchestrationService agentOrchestrationService;
 
-    public LoanApplicationServiceImpl(InMemoryApprovalStore store,
+    public LoanApplicationServiceImpl(ApprovalStore store,
                                       AgentOrchestrationService agentOrchestrationService) {
         this.store = store;
         this.agentOrchestrationService = agentOrchestrationService;
     }
 
     @Override
+    @Transactional
     public LoanApplicationResponse createApplication(CreateLoanApplicationRequest request) {
-        Long applicationId = store.nextApplicationId();
         LocalDateTime now = LocalDateTime.now();
 
         LoanApplication application = new LoanApplication(
-                applicationId,
-                generateApplicationNo(applicationId),
+                null,
+                generateApplicationNo(),
                 request.getProductCode(),
                 request.getApplicantName(),
                 request.getIdCardNo(),
@@ -53,8 +55,8 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 request.getEmploymentType(),
                 request.getCompanyName(),
                 request.getWorkYears(),
-                null,
-                null,
+                ApplicationStatus.SUBMITTED,
+                "申请已提交，等待自动审批预处理",
                 request.getChannelCode(),
                 now,
                 now
@@ -75,8 +77,8 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
          * 文档建议创建申请后立即启动审批编排。当前没有异步队列，所以采用同步调用：
          * 如果资料还没上传，编排会把申请推进到 DOCUMENT_PENDING，前端即可展示补件状态。
          */
-        agentOrchestrationService.startApprovalFlow(applicationId);
-        return toResponse(store.getApplicationOrThrow(applicationId));
+        agentOrchestrationService.startApprovalFlow(application.getApplicationId());
+        return toResponse(store.getApplicationOrThrow(application.getApplicationId()));
     }
 
     @Override
@@ -107,8 +109,9 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
         );
     }
 
-    private String generateApplicationNo(Long applicationId) {
-        return "APP" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + String.format("%06d", applicationId);
+    private String generateApplicationNo() {
+        String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
+        return "APP" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + suffix;
     }
 
     private LoanApplicationResponse toResponse(LoanApplication application) {
