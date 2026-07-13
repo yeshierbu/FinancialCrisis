@@ -1,0 +1,4 @@
+ocr:
+  baidu:
+    # 仅供本地演示：真实 OCR 不可用时返回明确标记的模拟结果。
+    fallback-to-mock: ${BAIDU_OCR_FALLBACK_TO_MOCK:true}
