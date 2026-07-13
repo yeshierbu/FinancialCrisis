@@ -22,6 +22,13 @@ body {
     sans-serif;
 }
 
+.login-shell {
+  background:
+    radial-gradient(circle at 18% 20%, rgb(34 211 238 / 0.16), transparent 30%),
+    radial-gradient(circle at 82% 75%, rgb(59 130 246 / 0.18), transparent 32%),
+    linear-gradient(135deg, #020617 0%, #0f172a 52%, #172554 100%);
+}
+
 button,
 input,
 select,
@@ -75,6 +82,10 @@ button:disabled {
 
 .btn-danger {
   @apply inline-flex items-center justify-center gap-2 rounded-lg bg-danger-500 px-5 py-3 font-medium text-white transition hover:bg-danger-600;
+}
+
+.nav-link {
+  @apply inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition;
 }
 
 .card {

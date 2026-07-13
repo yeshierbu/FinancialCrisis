@@ -31,6 +31,7 @@ ocr:
     base-url: ${BAIDU_OCR_BASE_URL:https://qianfan.baidubce.com/v2}
     model: ${BAIDU_OCR_MODEL:deepseek-ocr}
     timeout-seconds: ${BAIDU_OCR_TIMEOUT_SECONDS:60}
+    fallback-to-mock: ${BAIDU_OCR_FALLBACK_TO_MOCK:false}
 
 llm:
   # 不把真实 Key 写入仓库；本地环境设置 DEEPSEEK_API_KEY 即可启用。

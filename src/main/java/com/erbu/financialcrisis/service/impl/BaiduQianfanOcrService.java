@@ -4,10 +4,13 @@ import com.erbu.financialcrisis.domain.enums.DocumentType;
 import com.erbu.financialcrisis.service.QianfanOcrService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -22,17 +25,21 @@ import java.util.Map;
 @Service
 public class BaiduQianfanOcrService implements QianfanOcrService {
 
+    private static final Logger log = LoggerFactory.getLogger(BaiduQianfanOcrService.class);
+
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final String model;
+    private final boolean fallbackToMock;
 
     public BaiduQianfanOcrService(RestClient.Builder restClientBuilder,
                                   ObjectMapper objectMapper,
                                   @Value("${ocr.baidu.base-url:https://qianfan.baidubce.com/v2}") String baseUrl,
                                   @Value("${ocr.baidu.api-key:}") String apiKey,
                                   @Value("${ocr.baidu.model:deepseek-ocr}") String model,
-                                  @Value("${ocr.baidu.timeout-seconds:60}") long timeoutSeconds) {
+                                  @Value("${ocr.baidu.timeout-seconds:60}") long timeoutSeconds,
+                                  @Value("${ocr.baidu.fallback-to-mock:false}") boolean fallbackToMock) {
         Duration timeout = Duration.ofSeconds(timeoutSeconds);
         HttpClient httpClient = HttpClient.newBuilder().connectTimeout(timeout).build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
@@ -41,26 +48,27 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.model = model;
+        this.fallbackToMock = fallbackToMock;
     }
 
     @Override
     public String recognize(DocumentType documentType, String imageUrl) {
-        validateConfiguration(imageUrl);
-
-        Map<String, Object> payload = Map.of(
-                "model", model,
-                "messages", List.of(Map.of(
-                        "role", "user",
-                        "content", List.of(
-                                Map.of("type", "image_url", "image_url", Map.of("url", imageUrl)),
-                                Map.of("type", "text", "text", promptFor(documentType))
-                        )
-                )),
-                "stream", false,
-                "max_tokens", 2500
-        );
-
         try {
+            validateConfiguration(imageUrl);
+
+            Map<String, Object> payload = Map.of(
+                    "model", model,
+                    "messages", List.of(Map.of(
+                            "role", "user",
+                            "content", List.of(
+                                    Map.of("type", "text", "text", promptFor(documentType)),
+                                    Map.of("type", "image_url", "image_url", Map.of("url", imageUrl))
+                            )
+                    )),
+                    "stream", false,
+                    "max_tokens", 2500
+            );
+
             String responseBody = restClient.post()
                     .uri("/chat/completions")
                     .header("Authorization", "Bearer " + apiKey.trim())
@@ -86,9 +94,108 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
                     "text", recognizedText,
                     "recognizedAt", LocalDateTime.now().toString()
             ));
+        } catch (RestClientResponseException ex) {
+            String providerError = summarizeProviderError(ex.getResponseBodyAsString());
+            if (fallbackToMock) {
+                log.warn(
+                        "百度千帆 DeepSeek-OCR 请求失败，开发环境已启用模拟降级，documentType={}, model={}, httpStatus={}, providerError={}",
+                        documentType,
+                        model,
+                        ex.getStatusCode().value(),
+                        providerError
+                );
+                return mockFallbackResult(
+                        documentType,
+                        "HTTP_" + ex.getStatusCode().value(),
+                        providerError
+                );
+            }
+            log.error(
+                    "百度千帆 DeepSeek-OCR 请求失败，documentType={}, model={}, httpStatus={}, providerError={}",
+                    documentType,
+                    model,
+                    ex.getStatusCode().value(),
+                    providerError,
+                    ex
+            );
+            throw new IllegalStateException(
+                    "百度千帆 DeepSeek-OCR 调用失败，HTTP "
+                            + ex.getStatusCode().value() + "，" + providerError,
+                    ex
+            );
         } catch (Exception ex) {
+            if (fallbackToMock) {
+                log.warn(
+                        "百度千帆 DeepSeek-OCR 调用失败，开发环境已启用模拟降级，documentType={}, model={}, reason={}",
+                        documentType,
+                        model,
+                        safeLogValue(ex.getMessage())
+                );
+                return mockFallbackResult(
+                        documentType,
+                        "OCR_CLIENT_ERROR",
+                        safeLogValue(ex.getMessage())
+                );
+            }
+            log.error(
+                    "百度千帆 DeepSeek-OCR 调用或响应解析失败，documentType={}, model={}",
+                    documentType,
+                    model,
+                    ex
+            );
             throw new IllegalStateException("百度千帆 DeepSeek-OCR 调用失败", ex);
         }
+    }
+
+    private String mockFallbackResult(DocumentType documentType,
+                                      String failureCode,
+                                      String failureMessage) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "provider", "MOCK_FALLBACK",
+                    "model", "mock-ocr",
+                    "documentType", documentType.name(),
+                    "text", "模拟 OCR 结果：材料已接收，真实 OCR 当前不可用。",
+                    "mockFallback", true,
+                    "failureCode", failureCode,
+                    "failureMessage", failureMessage,
+                    "recognizedAt", LocalDateTime.now().toString()
+            ));
+        } catch (Exception ex) {
+            throw new IllegalStateException("创建 OCR 模拟降级结果失败", ex);
+        }
+    }
+
+    private String summarizeProviderError(String responseBody) {
+        if (responseBody == null || responseBody.isBlank()) {
+            return "providerError=EMPTY_RESPONSE_BODY";
+        }
+        try {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode error = root.path("error");
+            String code = firstNonBlank(error.path("code").asText(), root.path("code").asText());
+            String type = firstNonBlank(error.path("type").asText(), root.path("type").asText());
+            String message = firstNonBlank(error.path("message").asText(), root.path("message").asText());
+            return "code=" + safeLogValue(code)
+                    + ", type=" + safeLogValue(type)
+                    + ", message=" + safeLogValue(message);
+        } catch (Exception ignored) {
+            return "providerError=UNPARSEABLE_RESPONSE, bodyLength=" + responseBody.length();
+        }
+    }
+
+    private String firstNonBlank(String first, String second) {
+        return first != null && !first.isBlank() ? first : second;
+    }
+
+    private String safeLogValue(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+        String sanitized = value
+                .replaceAll("[\\r\\n\\t]+", " ")
+                .replaceAll("bce-v3/[^\\s,]+", "[REDACTED]");
+        return sanitized.length() <= 500 ? sanitized : sanitized.substring(0, 500) + "...";
     }
 
     private void validateConfiguration(String imageUrl) {

@@ -15,6 +15,8 @@ import com.erbu.financialcrisis.service.AgentOrchestrationService;
 import com.erbu.financialcrisis.service.DocumentService;
 import com.erbu.financialcrisis.service.QianfanOcrService;
 import com.erbu.financialcrisis.store.ApprovalStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,6 +39,8 @@ import java.util.UUID;
  */
 @Service
 public class DocumentServiceImpl implements DocumentService {
+
+    private static final Logger log = LoggerFactory.getLogger(DocumentServiceImpl.class);
 
     private static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png");
@@ -85,6 +89,15 @@ public class DocumentServiceImpl implements DocumentService {
             document.setOcrStatus(OcrStatus.SUCCESS);
             store.updateDocument(document);
         } catch (RuntimeException ex) {
+            log.error(
+                    "材料 OCR 失败，applicationId={}, documentId={}, documentType={}, contentType={}, fileSize={}",
+                    applicationId,
+                    document.getDocumentId(),
+                    documentType,
+                    contentType,
+                    file.getSize(),
+                    ex
+            );
             document.setOcrStatus(OcrStatus.FAILED);
             document.setParseResultJson("{\"provider\":\"BAIDU_QIANFAN\",\"error\":\"OCR_FAILED\"}");
             store.updateDocument(document);

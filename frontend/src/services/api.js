@@ -80,3 +80,42 @@ export const loanApi = {
     return request(`/api/loan/applications/${applicationId}/report`)
   },
 }
+
+function toQueryString(params) {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, String(value))
+    }
+  })
+  const value = query.toString()
+  return value ? `?${value}` : ''
+}
+
+export const adminApi = {
+  listPendingReviews(params = {}) {
+    return request(`/api/admin/reviews/pending${toQueryString(params)}`)
+  },
+
+  getReviewDetail(applicationId) {
+    return request(`/api/admin/reviews/${applicationId}`)
+  },
+
+  approveReview(applicationId, data) {
+    return request(`/api/admin/reviews/${applicationId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  rejectReview(applicationId, data) {
+    return request(`/api/admin/reviews/${applicationId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  getAuditTimeline(applicationId) {
+    return request(`/api/admin/audit/${applicationId}/timeline`)
+  },
+}

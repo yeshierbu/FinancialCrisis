@@ -1,15 +1,33 @@
-﻿<template>
+<template>
   <div class="min-h-screen">
     <Navbar
+      v-if="isLoggedIn"
       :current-view="currentView"
-      :is-logged-in="isLoggedIn"
+      :role="session.role"
+      :current-user="session"
       @navigate="handleNavigate"
-      @login="handleLogin"
+      @logout="handleLogout"
     />
 
-    <main class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
+    <main
+      :class="[
+        'mx-auto w-full px-4 sm:px-6',
+        isLoggedIn ? 'max-w-7xl py-8 lg:py-10' : 'max-w-none p-0',
+      ]"
+    >
+      <LoginPage
+        v-if="currentView === 'login'"
+        @logged-in="handleLoggedIn"
+      />
+
+      <AdminDashboard
+        v-else-if="currentView === 'admin'"
+        @view-application="handleViewDetail"
+        @view-list="handleNavigate('list')"
+      />
+
       <HomePage
-        v-if="currentView === 'home'"
+        v-else-if="currentView === 'home'"
         @start-application="handleNavigate('apply')"
         @view-tutorial="handleNavigate('tutorial')"
         @view-list="handleNavigate('list')"
@@ -25,13 +43,14 @@
         v-else-if="currentView === 'status'"
         :key="selectedApplicationId || 'latest-status'"
         :application-id="selectedApplicationId"
-        @back="handleNavigate('home')"
+        @back="handleNavigate(defaultView)"
         @view-list="handleNavigate('list')"
       />
 
       <ListPage
         v-else-if="currentView === 'list'"
-        @back="handleNavigate('home')"
+        :admin-mode="session.role === 'admin'"
+        @back="handleNavigate(defaultView)"
         @view-detail="handleViewDetail"
       />
 
@@ -41,67 +60,84 @@
         @start-application="handleNavigate('apply')"
       />
 
-      <LoginPage
-        v-else-if="currentView === 'login'"
-        @back="handleNavigate('home')"
-        @logged-in="handleLoggedIn"
-      />
-
       <ProfilePage
         v-else-if="currentView === 'profile'"
-        @back="handleNavigate('home')"
+        :account="session"
+        @back="handleNavigate(defaultView)"
         @logout="handleLogout"
         @navigate="handleNavigate"
       />
     </main>
 
-    <Footer />
+    <Footer v-if="isLoggedIn" />
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import Navbar from './components/Navbar.vue'
-import Footer from './components/Footer.vue'
-import HomePage from './components/HomePage.vue'
-import ApplyPage from './components/ApplyPage.vue'
-import StatusPage from './components/StatusPage.vue'
-import ListPage from './components/ListPage.vue'
-import TutorialPage from './components/TutorialPage.vue'
-import LoginPage from './components/LoginPage.vue'
-import ProfilePage from './components/ProfilePage.vue'
+import { computed, ref } from "vue";
+import Navbar from "./components/Navbar.vue";
+import Footer from "./components/Footer.vue";
+import AdminDashboard from "./components/AdminDashboard.vue";
+import HomePage from "./components/HomePage.vue";
+import ApplyPage from "./components/ApplyPage.vue";
+import StatusPage from "./components/StatusPage.vue";
+import ListPage from "./components/ListPage.vue";
+import TutorialPage from "./components/TutorialPage.vue";
+import LoginPage from "./components/LoginPage.vue";
+import ProfilePage from "./components/ProfilePage.vue";
+import { clearSession, readSession, saveSession } from "./services/auth";
 
-const currentView = ref('home')
-const isLoggedIn = ref(false)
-const selectedApplicationId = ref(null)
+const ADMIN_VIEWS = new Set(["admin", "list", "status", "profile"]);
+const USER_VIEWS = new Set([
+  "home",
+  "apply",
+  "status",
+  "list",
+  "tutorial",
+  "profile",
+]);
+
+const session = ref(readSession());
+const defaultView = computed(() =>
+  session.value?.role === "admin" ? "admin" : "home",
+);
+const currentView = ref(session.value ? defaultView.value : "login");
+const isLoggedIn = computed(() => Boolean(session.value));
+const selectedApplicationId = ref(null);
 
 function handleNavigate(view) {
-  currentView.value = view
+  if (!session.value) {
+    currentView.value = "login";
+    return;
+  }
+
+  const allowedViews = session.value.role === "admin" ? ADMIN_VIEWS : USER_VIEWS;
+  currentView.value = allowedViews.has(view) ? view : defaultView.value;
 }
 
-function handleLogin() {
-  currentView.value = 'login'
-}
-
-function handleLoggedIn() {
-  isLoggedIn.value = true
-  currentView.value = 'profile'
+function handleLoggedIn(account) {
+  session.value = account;
+  saveSession(account);
+  selectedApplicationId.value = null;
+  currentView.value = account.role === "admin" ? "admin" : "home";
 }
 
 function handleLogout() {
-  isLoggedIn.value = false
-  currentView.value = 'home'
+  clearSession();
+  session.value = null;
+  selectedApplicationId.value = null;
+  currentView.value = "login";
 }
 
 function handleSubmitted(applicationId) {
-  selectedApplicationId.value = applicationId
-  localStorage.setItem('latestApplicationId', String(applicationId))
-  currentView.value = 'status'
+  selectedApplicationId.value = applicationId;
+  localStorage.setItem("latestApplicationId", String(applicationId));
+  currentView.value = "status";
 }
 
 function handleViewDetail(applicationId) {
-  selectedApplicationId.value = applicationId
-  localStorage.setItem('latestApplicationId', String(applicationId))
-  currentView.value = 'status'
+  selectedApplicationId.value = applicationId;
+  localStorage.setItem("latestApplicationId", String(applicationId));
+  currentView.value = "status";
 }
 </script>

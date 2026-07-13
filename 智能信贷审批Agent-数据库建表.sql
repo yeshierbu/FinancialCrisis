@@ -1,3 +1,27 @@
+CREATE TABLE system_account (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '账号ID',
+    username VARCHAR(64) NOT NULL COMMENT '登录账号',
+    password_hash CHAR(64) NOT NULL COMMENT '密码SHA-256摘要，生产环境建议升级为BCrypt或Argon2',
+    role_code VARCHAR(32) NOT NULL COMMENT '角色编码：ADMIN-管理员，USER-客户端用户',
+    display_name VARCHAR(64) NOT NULL COMMENT '显示名称',
+    account_status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT '账号状态：ACTIVE-启用，DISABLED-停用，LOCKED-锁定',
+    last_login_at DATETIME DEFAULT NULL COMMENT '最后登录时间',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY uk_system_account_username (username),
+    KEY idx_system_account_role_status (role_code, account_status)
+) COMMENT='系统登录账号表';
+
+INSERT INTO system_account (
+    username,
+    password_hash,
+    role_code,
+    display_name,
+    account_status
+) VALUES
+    ('admin', SHA2('admin123', 256), 'ADMIN', '系统管理员', 'ACTIVE'),
+    ('user', SHA2('user123', 256), 'USER', '贷款客户', 'ACTIVE');
+
 CREATE TABLE loan_application (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '申请单ID',
     application_no VARCHAR(64) NOT NULL UNIQUE COMMENT '申请单编号',

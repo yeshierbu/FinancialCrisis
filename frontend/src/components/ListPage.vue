@@ -4,15 +4,21 @@
       class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
-        <p class="text-sm font-medium text-primary-600">申请记录</p>
-        <h1 class="text-2xl font-bold text-gray-950">后端申请列表</h1>
+        <p class="text-sm font-medium text-primary-600">
+          {{ adminMode ? "管理端 · 申请管理" : "客户端 · 申请记录" }}
+        </p>
+        <h1 class="text-2xl font-bold text-gray-950">
+          {{ adminMode ? "全量信贷申请" : "我的贷款申请" }}
+        </h1>
       </div>
       <div class="flex gap-3">
         <button class="btn-secondary" @click="loadApplications">
           <RefreshCw class="h-5 w-5" :class="loading ? 'animate-spin' : ''" />
           刷新
         </button>
-        <button class="btn-secondary" @click="$emit('back')">返回首页</button>
+        <button class="btn-secondary" @click="$emit('back')">
+          {{ adminMode ? "返回管理总览" : "返回首页" }}
+        </button>
       </div>
     </div>
 
@@ -162,6 +168,13 @@ import {
   Search,
 } from "lucide-vue-next";
 import { loanApi } from "../services/api";
+
+defineProps({
+  adminMode: {
+    type: Boolean,
+    default: false,
+  },
+});
 
 defineEmits(["back", "view-detail"]);
 

@@ -43,6 +43,12 @@ public class DocumentIntakeAgent {
                 .filter(requiredType -> !recognizedTypes.contains(requiredType))
                 .toList();
 
+        boolean usedMockFallback = documents.stream()
+                .filter(document -> document.getOcrStatus() == OcrStatus.SUCCESS)
+                .map(UploadedDocument::getParseResultJson)
+                .filter(result -> result != null && !result.isBlank())
+                .anyMatch(result -> result.contains("\"mockFallback\":true"));
+
         if (!missingDocuments.isEmpty()) {
             return new DocumentIntakeResult(
                     false,
@@ -56,9 +62,11 @@ public class DocumentIntakeAgent {
         return new DocumentIntakeResult(
                 true,
                 List.of(),
-                new BigDecimal("0.95"),
+                usedMockFallback ? new BigDecimal("0.60") : new BigDecimal("0.95"),
                 false,
-                "材料完整，已通过百度千帆 DeepSeek-OCR 识别"
+                usedMockFallback
+                        ? "材料完整，真实 OCR 不可用，已使用模拟 OCR 降级结果（仅供演示）"
+                        : "材料完整，已通过百度千帆 DeepSeek-OCR 识别"
         );
     }
 }
