@@ -74,8 +74,14 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
     @Transactional
     public void startApprovalFlow(Long applicationId) {
         LoanApplication application = store.getApplicationOrThrow(applicationId);
+        /**
+         * 创建本次审判流程的共享上下文，绑定当前的applicationId,后续各个Agent可以往这个上下文区域写发现
+         */
         ApprovalCaseContext context = new ApprovalCaseContext(applicationId);
 
+        /**
+         *
+         */
         try {
             store.changeStatus(
                     application,

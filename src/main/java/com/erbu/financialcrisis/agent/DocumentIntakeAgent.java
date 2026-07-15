@@ -31,24 +31,36 @@ public class DocumentIntakeAgent {
             DocumentType.BANK_STATEMENT
     );
 
-    /** 检查必需材料是否已通过百度千帆 OCR。 */
+    /** 检查必需材料是否已通过百度千帆 OCR。
+     * 检查一笔贷款申请的上传材料是否满足自动审批的最低要求*/
     public DocumentIntakeResult collectAndParse(LoanApplication application, List<UploadedDocument> documents) {
+
+        /**
+          * 从上传材料列表 documents 里找出“已经 OCR 成功的材料类型，存到recognizedTypes列表
+        */
         List<DocumentType> recognizedTypes = documents.stream()
                 .filter(document -> document.getOcrStatus() == OcrStatus.SUCCESS)
                 .map(UploadedDocument::getDocumentType)
                 .distinct()
                 .toList();
-
+        /**
+         * 和上传过的材料进行比较，看系统必须材料中还差哪些材料，并且添加到missingDocuments列表
+         */
         List<DocumentType> missingDocuments = REQUIRED_DOCUMENTS.stream()
                 .filter(requiredType -> !recognizedTypes.contains(requiredType))
                 .toList();
-
+/**
+ *判断有没有使用模拟 OCR 兜底生成的成功解析结果
+ */
         boolean usedMockFallback = documents.stream()
                 .filter(document -> document.getOcrStatus() == OcrStatus.SUCCESS)
                 .map(UploadedDocument::getParseResultJson)
                 .filter(result -> result != null && !result.isBlank())
                 .anyMatch(result -> result.contains("\"mockFallback\":true"));
 
+        /**
+         * 如果存在缺失材料提示补充missingDocuments
+         */
         if (!missingDocuments.isEmpty()) {
             return new DocumentIntakeResult(
                     false,
@@ -59,13 +71,16 @@ public class DocumentIntakeAgent {
             );
         }
 
+        /**
+         * 不存在材料缺失，后续只判断是否有mockFallback为true的数据
+         */
         return new DocumentIntakeResult(
                 true,
                 List.of(),
                 usedMockFallback ? new BigDecimal("0.60") : new BigDecimal("0.95"),
                 false,
                 usedMockFallback
-                        ? "材料完整，真实 OCR 不可用，已使用模拟 OCR 降级结果（仅供演示）"
+                        ? "材料完整，真实 OCR 不可用，已使用模拟 OCR 降级结果 "
                         : "材料完整，已通过百度千帆 DeepSeek-OCR 识别"
         );
     }
