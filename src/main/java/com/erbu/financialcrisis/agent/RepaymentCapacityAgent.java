@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
  */
 @Component
 public class RepaymentCapacityAgent {
-
+    //假设设定“每月最低生活成本”为 3000 元。
     private static final BigDecimal MONTHLY_LIVING_COST = new BigDecimal("3000");
 
     /** 估算收入、DTI、可承受月供和推荐授信额度。 */
