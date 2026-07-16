@@ -21,6 +21,15 @@ import java.time.LocalDateTime;
 public class ComplianceDecisionAgent {
 
     /** 按硬性拒绝、人工复核、自动通过的优先级生成最终审批决定。 */
+    /**
+     *
+     * @param application   贷款申请主信息
+     * @param documentResult  材料采集结果
+     * @param fraudRiskResult  反欺诈结果
+     * @param repaymentResult  偿债能力结果
+     * @param policyReviewResult  审查 Agent 或 LLM 复核结果
+     * @return
+     */
     public ApprovalDecision decide(LoanApplication application,
                                    DocumentIntakeResult documentResult,
                                    FraudRiskResult fraudRiskResult,
@@ -29,6 +38,9 @@ public class ComplianceDecisionAgent {
         /*
          * 决策顺序很重要：先处理硬性不可继续条件，再判断人工复核，最后才自动通过。
          * 这样能避免“大模型/解释文本”覆盖硬规则，也方便后续把这些判断迁移到规则引擎。
+         */
+        /**
+         * 如果申请材料需要补充，就直接生成一个“人工复核”决策，不再进行后面的反欺诈，偿债能力，自动通过逻辑
          */
         if (Boolean.TRUE.equals(documentResult.getNeedSupplement())) {
             return buildDecision(
@@ -39,7 +51,9 @@ public class ComplianceDecisionAgent {
                     "材料不完整，需补件或人工确认后再继续审批"
             );
         }
-
+        /**
+         * 反欺诈硬性拒绝，表示立即返回最终审批结果，不再继续后面的偿债能力、人工复核、自动通过判断
+         */
         if ("REJECT".equals(fraudRiskResult.getSuggestedAction())) {
             return buildDecision(
                     application,
@@ -49,7 +63,9 @@ public class ComplianceDecisionAgent {
                     "反欺诈规则命中本地模拟黑名单，触发硬性拒绝策略"
             );
         }
-
+        /**
+         * 如果审查 Agent 认为申请存在硬性风险条件，系统直接拒绝，不再继续后面的人工复核或自动通过判断
+         */
         if ("REJECT".equals(policyReviewResult.getRecommendedAction())) {
             return buildDecision(
                     application,
@@ -59,7 +75,9 @@ public class ComplianceDecisionAgent {
                     "审查 Agent 确认存在硬性风险条件，规则决策拒绝"
             );
         }
-
+/**
+ *如果申请人的债务收入比超过 70%，说明偿债压力过高，系统直接拒绝
+ */
         if (repaymentResult.getDti().compareTo(new BigDecimal("0.70")) > 0) {
             return buildDecision(
                     application,
@@ -69,7 +87,9 @@ public class ComplianceDecisionAgent {
                     "债务收入比超过 70%，偿债压力过高，不满足自动准入条件"
             );
         }
-
+/**
+ * 满足一个条件进行人工复核
+ */
         if (Boolean.TRUE.equals(policyReviewResult.getNeedManualReview())
                 || fraudRiskResult.getRiskLevel() == RiskLevel.MEDIUM
                 || fraudRiskResult.getRiskLevel() == RiskLevel.HIGH
@@ -82,7 +102,9 @@ public class ComplianceDecisionAgent {
                     "审查 Agent 发现风险边界或结论冲突，转人工复核确认：" + policyReviewResult.getSummary()
             );
         }
-
+        /**
+         * 批准金额不能超过用户申请金额getLoanAmount()，也不能超过系统根据偿债能力计算出的推荐额度getRecommendedCreditLimit()
+         */
         BigDecimal approvedAmount = application.getLoanAmount().min(repaymentResult.getRecommendedCreditLimit());
         return buildDecision(
                 application,
@@ -93,6 +115,15 @@ public class ComplianceDecisionAgent {
         );
     }
 
+    /**
+     *
+     * @param application
+     * @param decisionResult
+     * @param approvedAmount
+     * @param rejectReasonCode
+     * @param decisionExplanation
+     * @return
+     */
     private ApprovalDecision buildDecision(LoanApplication application,
                                            DecisionResult decisionResult,
                                            BigDecimal approvedAmount,
