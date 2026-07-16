@@ -1,3 +1,2 @@
-com\erbu\financialcrisis\service\impl\BaiduQianfanOcrServiceTests.class
-com\erbu\financialcrisis\agent\LlmApprovalAgentStrictModeTests.class
-com\erbu\financialcrisis\FinancialCrisisApplicationTests.class
+com/erbu/financialcrisis/agent/LlmApprovalAgentStrictModeTests.class
+com/erbu/financialcrisis/service/impl/BaiduQianfanOcrServiceTests.class

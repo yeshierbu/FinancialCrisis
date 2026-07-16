@@ -22,20 +22,27 @@ public class RepaymentCapacityAgent {
     public RepaymentCapacityResult evaluate(LoanApplication application, DocumentIntakeResult documentResult) {
         BigDecimal stableMonthlyIncome = estimateStableMonthlyIncome(application, documentResult);
         BigDecimal monthlyDebtPayment = calculateMonthlyPayment(application);
+        //DTI = 月还款额 / 稳定月收入
         BigDecimal dti = divide(monthlyDebtPayment, stableMonthlyIncome);
+        //FOIR = (月还款额 + 生活成本) / 稳定月收入
         BigDecimal foir = divide(monthlyDebtPayment.add(MONTHLY_LIVING_COST), stableMonthlyIncome);
+      //可支配收入 = 稳定月收入 - 月还款额 - 每月最低生活成本
         BigDecimal disposableIncome = stableMonthlyIncome.subtract(monthlyDebtPayment).subtract(MONTHLY_LIVING_COST);
+     //收入稳定性分
         BigDecimal incomeStabilityScore = estimateIncomeStabilityScore(application);
 
         /*
          * 第一版用“收入的 45% 减生活成本”估算最大可承受月供。真实系统里可以把产品利率、
          * 家庭负债、地区生活成本和征信负债都纳入模型。
          */
+        //最大可承受月供
+        //最大可承受月供 = max(稳定月收入 × 45% - 每月最低生活成本, 0)
         BigDecimal maxAffordableEmi = stableMonthlyIncome
                 .multiply(new BigDecimal("0.45"))
                 .subtract(MONTHLY_LIVING_COST)
                 .max(BigDecimal.ZERO)
                 .setScale(2, RoundingMode.HALF_UP);
+        //推荐授信额度 = 最大可承受月供 × 贷款期限 × 80%
         BigDecimal recommendedCreditLimit = maxAffordableEmi
                 .multiply(BigDecimal.valueOf(application.getLoanTerm()))
                 .multiply(new BigDecimal("0.80"))
@@ -94,11 +101,23 @@ public class RepaymentCapacityAgent {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * 根据申请人的工作年限估算收入稳定性分数
+     * 收入稳定性分 = min(100, 60 + 工作年限 *8）
+     * @param application
+     * @return
+     */
     private BigDecimal estimateIncomeStabilityScore(LoanApplication application) {
         int workYears = application.getWorkYears() == null ? 0 : application.getWorkYears();
         return BigDecimal.valueOf(Math.min(100, 60 + workYears * 8));
     }
 
+    /**
+     * 安全除法工具方法
+     * @param numerator
+     * @param denominator
+     * @return
+     */
     private BigDecimal divide(BigDecimal numerator, BigDecimal denominator) {
         if (denominator == null || denominator.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ONE;
