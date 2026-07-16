@@ -25,7 +25,7 @@ public class ComplianceDecisionAgent {
                                    DocumentIntakeResult documentResult,
                                    FraudRiskResult fraudRiskResult,
                                    RepaymentCapacityResult repaymentResult,
-                                   PolicyReviewResult policyReviewResult) {
+                                   PolicyReviewResult policyReviewResult){
         /*
          * 决策顺序很重要：先处理硬性不可继续条件，再判断人工复核，最后才自动通过。
          * 这样能避免“大模型/解释文本”覆盖硬规则，也方便后续把这些判断迁移到规则引擎。

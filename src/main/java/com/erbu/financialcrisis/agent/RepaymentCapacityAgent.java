@@ -58,6 +58,11 @@ public class RepaymentCapacityAgent {
         );
     }
 
+    /**
+     * 估算月还款额度
+     * @param application
+     * @return
+     */
     private BigDecimal calculateMonthlyPayment(LoanApplication application) {
         return application.getLoanAmount()
                 .divide(BigDecimal.valueOf(application.getLoanTerm()), 2, RoundingMode.HALF_UP)
@@ -65,18 +70,25 @@ public class RepaymentCapacityAgent {
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * 估算稳定月收入
+     * @param application
+     * @param documentResult
+     * @return
+     */
     private BigDecimal estimateStableMonthlyIncome(LoanApplication application, DocumentIntakeResult documentResult) {
-        int workYears = application.getWorkYears() == null ? 0 : application.getWorkYears();
-        BigDecimal baseIncome = switch (String.valueOf(application.getEmploymentType())) {
+        int workYears = application.getWorkYears() == null ? 0 : application.getWorkYears();//工作年限
+        BigDecimal baseIncome = switch (String.valueOf(application.getEmploymentType())) { //工作类型
             case "FULL_TIME" -> new BigDecimal("12000");
             case "SELF_EMPLOYED" -> new BigDecimal("10000");
             default -> new BigDecimal("8000");
         };
 
-        BigDecimal seniorityBonus = BigDecimal.valueOf(Math.min(workYears, 10)).multiply(new BigDecimal("800"));
-        BigDecimal confidenceDiscount = documentResult.getParseConfidence().compareTo(new BigDecimal("0.80")) >= 0
+        BigDecimal seniorityBonus = BigDecimal.valueOf(Math.min(workYears, 10)).multiply(new BigDecimal("800"));//工龄奖励，最多奖励10年
+        BigDecimal confidenceDiscount = documentResult.getParseConfidence().compareTo(new BigDecimal("0.80")) >= 0//如果材料置信度低于0.80，收入按0.8计算
                 ? BigDecimal.ONE
                 : new BigDecimal("0.80");
+        //最终收入 = (基础收入 + 工龄奖励) * 置信度折扣
         return baseIncome.add(seniorityBonus)
                 .multiply(confidenceDiscount)
                 .setScale(2, RoundingMode.HALF_UP);
