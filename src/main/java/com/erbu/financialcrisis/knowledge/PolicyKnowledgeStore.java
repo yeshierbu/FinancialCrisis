@@ -10,4 +10,6 @@ public interface PolicyKnowledgeStore {
     List<PolicyEvidence> search(String query, String productCode, LocalDate effectiveDate, int limit);
 
     void upsert(PolicyChunk chunk);
+
+    void deleteDocumentVersion(String documentId, String version);
 }

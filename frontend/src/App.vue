@@ -22,7 +22,6 @@
 
       <AdminDashboard
         v-else-if="currentView === 'admin'"
-        @view-application="handleViewDetail"
         @view-list="handleNavigate('list')"
       />
 

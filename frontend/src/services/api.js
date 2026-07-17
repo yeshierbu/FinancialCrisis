@@ -93,6 +93,22 @@ function toQueryString(params) {
 }
 
 export const adminApi = {
+  listPolicyDocuments() {
+    return request('/api/admin/policy-knowledge/documents')
+  },
+
+  uploadPolicyDocument(data, file) {
+    const formData = new FormData()
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') formData.append(key, value)
+    })
+    formData.append('file', file)
+    return request('/api/admin/policy-knowledge/documents', {
+      method: 'POST',
+      body: formData,
+    })
+  },
+
   listPendingReviews(params = {}) {
     return request(`/api/admin/reviews/pending${toQueryString(params)}`)
   },
@@ -115,7 +131,4 @@ export const adminApi = {
     })
   },
 
-  getAuditTimeline(applicationId) {
-    return request(`/api/admin/audit/${applicationId}/timeline`)
-  },
 }

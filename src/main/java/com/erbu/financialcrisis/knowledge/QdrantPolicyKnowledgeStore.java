@@ -118,6 +118,22 @@ public class QdrantPolicyKnowledgeStore implements PolicyKnowledgeStore {
                 .retrieve().toBodilessEntity();
     }
 
+    @Override
+    public void deleteDocumentVersion(String documentId, String version) {
+        if (!enabled) return;
+        try {
+            RestClient.RequestBodySpec request = restClient.post()
+                    .uri("/collections/{collection}/points/delete?wait=true", collection)
+                    .contentType(MediaType.APPLICATION_JSON);
+            addApiKey(request);
+            request.body(Map.of("filter", Map.of("must", List.of(
+                            match("documentId", documentId), match("version", version)))))
+                    .retrieve().toBodilessEntity();
+        } catch (HttpClientErrorException.NotFound ignored) {
+            // 首次导入时 Collection 尚未创建，由第一条 upsert 根据向量维度自动创建。
+        }
+    }
+
     private void ensureCollection(int vectorSize) {
         try {
             RestClient.RequestHeadersSpec<?> get = restClient.get()

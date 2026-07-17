@@ -5,10 +5,10 @@
     >
       <div>
         <p class="text-sm font-medium text-primary-600">
-          {{ adminMode ? "管理端 · 申请管理" : "客户端 · 申请记录" }}
+          {{ adminMode ? "管理端 · 审批结果" : "客户端 · 申请记录" }}
         </p>
         <h1 class="text-2xl font-bold text-gray-950">
-          {{ adminMode ? "全量信贷申请" : "我的贷款申请" }}
+          {{ adminMode ? "最终审批结果" : "我的贷款申请" }}
         </h1>
       </div>
       <div class="flex gap-3">
@@ -83,9 +83,9 @@
               <th class="px-6 py-3 font-medium">产品</th>
               <th class="px-6 py-3 font-medium">金额</th>
               <th class="px-6 py-3 font-medium">期限</th>
-              <th class="px-6 py-3 font-medium">状态</th>
+              <th class="px-6 py-3 font-medium">{{ adminMode ? "最终结果" : "状态" }}</th>
               <th class="px-6 py-3 font-medium">提交时间</th>
-              <th class="px-6 py-3 font-medium">操作</th>
+              <th v-if="!adminMode" class="px-6 py-3 font-medium">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
@@ -105,7 +105,7 @@
                 {{ formatMoney(item.loanAmount) }}
               </td>
               <td class="px-6 py-4 text-gray-600">{{ item.loanTerm }} 个月</td>
-              <td class="px-6 py-4">
+              <td v-if="!adminMode" class="px-6 py-4">
                 <span :class="['status-badge', getStatusClass(item.status)]">{{
                   getStatusText(item.status)
                 }}</span>
@@ -169,7 +169,7 @@ import {
 } from "lucide-vue-next";
 import { loanApi } from "../services/api";
 
-defineProps({
+const props = defineProps({
   adminMode: {
     type: Boolean,
     default: false,
@@ -186,7 +186,7 @@ const statusFilter = ref("");
 const currentPage = ref(1);
 const pageSize = 10;
 
-const statusOptions = [
+const allStatusOptions = [
   "SUBMITTED",
   "DOCUMENT_PENDING",
   "OCR_PARSING",
@@ -196,10 +196,16 @@ const statusOptions = [
   "APPROVED",
   "REJECTED",
 ];
+const statusOptions = computed(() => props.adminMode
+  ? ["APPROVED", "REJECTED", "ARCHIVED"]
+  : allStatusOptions);
 
 const filteredApplications = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase();
   return applications.value.filter((item) => {
+    if (props.adminMode && !["APPROVED", "REJECTED", "ARCHIVED"].includes(item.status)) {
+      return false;
+    }
     const matchesKeyword =
       !keyword ||
       [item.applicationNo, item.applicantName, getProductName(item.productCode)]

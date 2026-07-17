@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * 人工复核详情响应。
@@ -20,7 +21,21 @@ public class ManualReviewDetailResponse {
     private String ticketNo;
     private String productCode;
     private String applicantName;
+    private String applicationNo;
+    private String idCardNo;
+    private String mobile;
+    private BigDecimal loanAmount;
+    private Integer loanTerm;
+    private String employmentType;
+    private String companyName;
+    private Integer workYears;
+    private LocalDateTime appliedAt;
     private String riskSummary;
+    private BigDecimal riskScore;
+    private BigDecimal stableMonthlyIncome;
+    private BigDecimal monthlyDebtPayment;
+    private BigDecimal dti;
+    private BigDecimal recommendedCreditLimit;
     private ReviewStatus reviewStatus;
     private DecisionResult decisionResult;
     private BigDecimal approvedAmount;

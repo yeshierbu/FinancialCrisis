@@ -62,13 +62,29 @@ public class ManualReviewServiceImpl implements ManualReviewService {
         ManualReviewTicket ticket = store.findReviewTicket(applicationId)
                 .orElseThrow(() -> new BusinessException(4002, "人工复核工单不存在"));
         ApprovalDecision decision = store.findApprovalDecision(applicationId).orElse(null);
+        FraudRiskResult fraud = store.findFraudResult(applicationId).orElse(null);
+        RepaymentCapacityResult repayment = store.findRepaymentResult(applicationId).orElse(null);
 
         return new ManualReviewDetailResponse(
                 applicationId,
                 ticket.getTicketNo(),
                 application.getProductCode(),
                 application.getApplicantName(),
+                application.getApplicationNo(),
+                application.getIdCardNo(),
+                application.getMobile(),
+                application.getLoanAmount(),
+                application.getLoanTerm(),
+                application.getEmploymentType(),
+                application.getCompanyName(),
+                application.getWorkYears(),
+                application.getCreatedAt(),
                 ticket.getRiskSummary(),
+                fraud == null ? null : fraud.getRiskScore(),
+                repayment == null ? null : repayment.getStableMonthlyIncome(),
+                repayment == null ? null : repayment.getMonthlyDebtPayment(),
+                repayment == null ? null : repayment.getDti(),
+                repayment == null ? null : repayment.getRecommendedCreditLimit(),
                 ticket.getReviewStatus(),
                 decision == null ? null : decision.getDecisionResult(),
                 decision == null ? null : decision.getApprovedAmount(),
