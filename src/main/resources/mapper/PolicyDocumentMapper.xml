@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.PolicyDocumentMapper">
+    <sql id="columns">
+        id, document_id, title, version, product_code, status, effective_from, effective_to,
+        source_url, content_hash, qdrant_collection, vector_sync_status, created_by, created_at, updated_at
+    </sql>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO policy_document
+        (document_id, title, version, product_code, status, effective_from, effective_to,
+         source_url, content_hash, qdrant_collection, vector_sync_status, created_by, created_at, updated_at)
+        VALUES
+        (#{documentId}, #{title}, #{version}, #{productCode}, #{status}, #{effectiveFrom}, #{effectiveTo},
+         #{sourceUrl}, #{contentHash}, #{qdrantCollection}, #{vectorSyncStatus}, #{createdBy}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="updateByDocumentIdAndVersion">
+        UPDATE policy_document SET title=#{title}, product_code=#{productCode}, status=#{status},
+        effective_from=#{effectiveFrom}, effective_to=#{effectiveTo}, source_url=#{sourceUrl},
+        content_hash=#{contentHash}, qdrant_collection=#{qdrantCollection},
+        vector_sync_status=#{vectorSyncStatus}, created_by=#{createdBy}, updated_at=#{updatedAt}
+        WHERE document_id=#{documentId} AND version=#{version}
+    </update>
+    <select id="selectByDocumentIdAndVersion" resultType="com.erbu.financialcrisis.domain.entity.PolicyDocument">
+        SELECT <include refid="columns"/> FROM policy_document
+        WHERE document_id=#{documentId} AND version=#{version} LIMIT 1
+    </select>
+    <select id="selectRecent" resultType="com.erbu.financialcrisis.domain.entity.PolicyDocument">
+        SELECT <include refid="columns"/> FROM policy_document ORDER BY updated_at DESC, id DESC LIMIT 100
+    </select>
+</mapper>
