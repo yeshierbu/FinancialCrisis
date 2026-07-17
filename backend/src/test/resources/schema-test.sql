@@ -92,3 +92,17 @@ CREATE TABLE policy_document (
     updated_at TIMESTAMP,
     UNIQUE (document_id, version)
 );
+CREATE TABLE risk_blacklist (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    subject_type VARCHAR(32) NOT NULL,
+    subject_hash CHAR(64) NOT NULL,
+    risk_level VARCHAR(16) NOT NULL,
+    reason_code VARCHAR(64) NOT NULL,
+    source VARCHAR(64) NOT NULL,
+    status VARCHAR(16) NOT NULL,
+    effective_from TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    effective_to TIMESTAMP NULL,
+    created_by VARCHAR(64),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+);

@@ -56,3 +56,27 @@ knowledge:
     url: ${QDRANT_URL:http://localhost:6333}
     api-key: ${QDRANT_API_KEY:}
     collection: ${QDRANT_POLICY_COLLECTION:credit_policy_chunks}
+
+# 偿债能力的确定性参数可通过环境变量覆盖，不再固化在 Java 计算代码中。
+approval:
+  documents:
+    required-types: ${REQUIRED_DOCUMENT_TYPES:ID_CARD_FRONT,ID_CARD_BACK,BANK_STATEMENT}
+  fraud:
+    base-score: ${FRAUD_BASE_SCORE:20}
+    blacklist-score: ${FRAUD_BLACKLIST_SCORE:75}
+    suspicious-mobile-score: ${FRAUD_SUSPICIOUS_MOBILE_SCORE:20}
+    high-amount-threshold: ${FRAUD_HIGH_AMOUNT_THRESHOLD:100000}
+    short-work-years: ${FRAUD_SHORT_WORK_YEARS:2}
+    high-amount-score: ${FRAUD_HIGH_AMOUNT_SCORE:25}
+    incomplete-document-score: ${FRAUD_INCOMPLETE_DOCUMENT_SCORE:30}
+    medium-risk-threshold: ${FRAUD_MEDIUM_RISK_THRESHOLD:50}
+    high-risk-threshold: ${FRAUD_HIGH_RISK_THRESHOLD:80}
+  repayment:
+    monthly-living-cost: ${REPAYMENT_MONTHLY_LIVING_COST:3000}
+    full-time-base-income: ${REPAYMENT_FULL_TIME_BASE_INCOME:12000}
+    self-employed-base-income: ${REPAYMENT_SELF_EMPLOYED_BASE_INCOME:10000}
+    default-base-income: ${REPAYMENT_DEFAULT_BASE_INCOME:8000}
+    annual-seniority-bonus: ${REPAYMENT_ANNUAL_SENIORITY_BONUS:800}
+    max-payment-ratio: ${REPAYMENT_MAX_PAYMENT_RATIO:0.45}
+    credit-safety-factor: ${REPAYMENT_CREDIT_SAFETY_FACTOR:0.80}
+    annual-rate-factor: ${REPAYMENT_ANNUAL_RATE_FACTOR:1.08}

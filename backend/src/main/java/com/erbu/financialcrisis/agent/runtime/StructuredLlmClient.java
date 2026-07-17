@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/** 三个 Worker 共用的结构化模型调用入口，统一处理可用性和 JSON 校验。 */
+/** LLM Worker 共用的结构化模型调用入口，统一处理可用性和 JSON 校验。 */
 @Component
 public class StructuredLlmClient {
     private final ChatLanguageModel model;

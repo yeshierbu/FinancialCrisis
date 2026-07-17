@@ -53,7 +53,7 @@ class FinancialCrisisApplicationTests {
 
     @BeforeEach
     void mockMultiAgentResponses() {
-        // 使用一个包含三个工件字段的 JSON，分别供 Risk、Review、Decision Worker 解析。
+        // 使用一个联合 JSON 模拟四个 Worker 的结构化输出，测试不访问真实 LLM。
         // Spring Boot 的 ObjectMapper 会忽略当前目标 DTO 不需要的字段。
         String json = """
                 {

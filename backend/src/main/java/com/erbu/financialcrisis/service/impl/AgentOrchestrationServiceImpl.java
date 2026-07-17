@@ -1,8 +1,9 @@
 package com.erbu.financialcrisis.service.impl;
 
-import com.erbu.financialcrisis.agent.DocumentIntakeAgent;
-import com.erbu.financialcrisis.agent.FraudRiskAgent;
-import com.erbu.financialcrisis.agent.RepaymentCapacityAgent;
+import com.erbu.financialcrisis.agent.tool.DocumentIntakeTool;
+import com.erbu.financialcrisis.agent.tool.FraudRiskTool;
+import com.erbu.financialcrisis.agent.tool.RepaymentCapacityCalculator;
+import com.erbu.financialcrisis.agent.artifact.DocumentAnalysisReport;
 import com.erbu.financialcrisis.agent.artifact.DecisionProposal;
 import com.erbu.financialcrisis.agent.artifact.ReviewReport;
 import com.erbu.financialcrisis.agent.artifact.RiskReport;
@@ -11,6 +12,7 @@ import com.erbu.financialcrisis.agent.collaboration.ApprovalCaseContext;
 import com.erbu.financialcrisis.agent.guard.PolicyGuard;
 import com.erbu.financialcrisis.agent.result.DocumentIntakeResult;
 import com.erbu.financialcrisis.agent.worker.DecisionWorker;
+import com.erbu.financialcrisis.agent.worker.DocumentAnalysisWorker;
 import com.erbu.financialcrisis.agent.worker.ReviewWorker;
 import com.erbu.financialcrisis.agent.worker.RiskWorker;
 import com.erbu.financialcrisis.domain.entity.AgentTaskLog;
@@ -46,26 +48,29 @@ import java.util.function.Supplier;
 public class AgentOrchestrationServiceImpl implements AgentOrchestrationService {
 
     private final ApprovalStore store;
-    private final DocumentIntakeAgent documentIntakeAgent;
-    private final FraudRiskAgent fraudRiskAgent;
-    private final RepaymentCapacityAgent repaymentCapacityAgent;
+    private final DocumentIntakeTool documentIntakeTool;
+    private final FraudRiskTool fraudRiskTool;
+    private final RepaymentCapacityCalculator repaymentCapacityCalculator;
+    private final DocumentAnalysisWorker documentAnalysisWorker;
     private final RiskWorker riskWorker;
     private final ReviewWorker reviewWorker;
     private final DecisionWorker decisionWorker;
     private final PolicyGuard policyGuard;
 
     public AgentOrchestrationServiceImpl(ApprovalStore store,
-                                         DocumentIntakeAgent documentIntakeAgent,
-                                         FraudRiskAgent fraudRiskAgent,
-                                         RepaymentCapacityAgent repaymentCapacityAgent,
+                                         DocumentIntakeTool documentIntakeTool,
+                                         FraudRiskTool fraudRiskTool,
+                                         RepaymentCapacityCalculator repaymentCapacityCalculator,
+                                         DocumentAnalysisWorker documentAnalysisWorker,
                                          RiskWorker riskWorker,
                                          ReviewWorker reviewWorker,
                                          DecisionWorker decisionWorker,
                                          PolicyGuard policyGuard) {
         this.store = store;
-        this.documentIntakeAgent = documentIntakeAgent;
-        this.fraudRiskAgent = fraudRiskAgent;
-        this.repaymentCapacityAgent = repaymentCapacityAgent;
+        this.documentIntakeTool = documentIntakeTool;
+        this.fraudRiskTool = fraudRiskTool;
+        this.repaymentCapacityCalculator = repaymentCapacityCalculator;
+        this.documentAnalysisWorker = documentAnalysisWorker;
         this.riskWorker = riskWorker;
         this.reviewWorker = reviewWorker;
         this.decisionWorker = decisionWorker;
@@ -92,7 +97,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
             store.changeStatus(
                     application,
                     ApplicationStatus.OCR_PARSING,
-                    "信息采集 Agent 解析申请材料",
+                    "材料采集工具校验申请材料",
                     "START_APPROVAL_FLOW",
                     OperatorType.SYSTEM,
                     "orchestrator",
@@ -102,14 +107,14 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
             List<UploadedDocument> documents = store.listDocuments(applicationId);
             DocumentIntakeResult documentResult = runAgent(
                     applicationId,
-                    "DocumentIntakeAgent",
+                    "DocumentIntakeTool",
                     "材料完整性与百度千帆 OCR 结果校验",
                     "documents=" + documents.size(),
-                    () -> documentIntakeAgent.collectAndParse(application, documents)
+                    () -> documentIntakeTool.collectAndParse(application, documents)
             );
             documents.forEach(store::updateDocument);
             context.addFinding(new AgentFinding(
-                    "DocumentIntakeAgent",
+                    "DocumentIntakeTool",
                     "材料采集",
                     documentResult.getSummary(),
                     documentResult.getParseConfidence(),
@@ -124,7 +129,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                         "等待用户补充材料：" + documentResult.getMissingDocuments(),
                         "DOCUMENT_SUPPLEMENT_REQUIRED",
                         OperatorType.AGENT,
-                        "DocumentIntakeAgent",
+                        "DocumentIntakeTool",
                         documentResult.getSummary()
                 );
                 return;
@@ -136,20 +141,34 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     "反欺诈风控与偿债能力分析中",
                     "DOCUMENT_INTAKE_FINISHED",
                     OperatorType.AGENT,
-                    "DocumentIntakeAgent",
+                    "DocumentIntakeTool",
                     documentResult.getSummary()
             );
 
+            DocumentAnalysisReport documentAnalysis = runAgent(
+                    applicationId,
+                    "DocumentAnalysisWorker",
+                    "LLM 理解 OCR 文本与材料一致性",
+                    "documents=" + documents.size(),
+                    () -> documentAnalysisWorker.analyze(application, documents, documentResult)
+            );
+            context.addFinding(new AgentFinding(
+                    "DocumentAnalysisWorker", "LLM 材料分析", documentAnalysis.getSummary(),
+                    documentAnalysis.getConfidence(),
+                    documentAnalysis.getEvidence() == null ? List.of() : documentAnalysis.getEvidence(),
+                    documentAnalysis.getRecommendedAction()
+            ));
+
             FraudRiskResult fraudRiskResult = runAgent(
                     applicationId,
-                    "FraudRiskAgent",
+                    "FraudRiskTool",
                     "反欺诈规则评估",
                     application.getApplicationNo(),
-                    () -> fraudRiskAgent.evaluate(application, documentResult)
+                    () -> fraudRiskTool.evaluate(application, documentResult)
             );
             store.saveFraudResult(fraudRiskResult);
             context.addFinding(new AgentFinding(
-                    "FraudRiskAgent",
+                    "FraudRiskTool",
                     "反欺诈风控",
                     "风险等级：" + fraudRiskResult.getRiskLevel() + "，建议动作：" + fraudRiskResult.getSuggestedAction(),
                     fraudRiskResult.getRiskScore().divide(new java.math.BigDecimal("100")),
@@ -159,14 +178,14 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
 
             RepaymentCapacityResult repaymentResult = runAgent(
                     applicationId,
-                    "RepaymentCapacityAgent",
+                    "RepaymentCapacityCalculator",
                     "DTI 与建议额度测算",
                     application.getLoanAmount().toPlainString(),
-                    () -> repaymentCapacityAgent.evaluate(application, documentResult)
+                    () -> repaymentCapacityCalculator.evaluate(application, documentResult)
             );
             store.saveRepaymentResult(repaymentResult);
             context.addFinding(new AgentFinding(
-                    "RepaymentCapacityAgent",
+                    "RepaymentCapacityCalculator",
                     "偿债能力测算",
                     "DTI：" + repaymentResult.getDti() + "，建议额度：" + repaymentResult.getRecommendedCreditLimit(),
                     repaymentResult.getIncomeStabilityScore().divide(new java.math.BigDecimal("100")),
@@ -183,7 +202,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     "协作审查与合规决策 Agent 汇总审批结论",
                     "RISK_ANALYSIS_FINISHED",
                     OperatorType.AGENT,
-                    "RepaymentCapacityAgent",
+                    "RepaymentCapacityCalculator",
                     "风险与偿债能力分析完成"
             );
 

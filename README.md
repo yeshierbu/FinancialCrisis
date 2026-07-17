@@ -53,9 +53,10 @@ Spring Boot REST API
           |
           +-- 多 Agent 审批编排
           |     |
-          |     +-- DocumentIntakeAgent：材料检查与 OCR 结果整理
-          |     +-- FraudRiskAgent：确定性反欺诈评估
-          |     +-- RepaymentCapacityAgent：偿债能力计算
+          |     +-- DocumentIntakeTool：材料存在性与 OCR 状态校验
+          |     +-- DocumentAnalysisWorker：LLM 理解 OCR 文本与材料一致性
+          |     +-- FraudRiskTool：MySQL 精确黑名单与确定性风险检查
+          |     +-- RepaymentCapacityCalculator：可配置的偿债能力计算
           |     +-- RiskWorker：LLM 风险分析与政策检索
           |     +-- ReviewWorker：独立 LLM 复核
           |     +-- DecisionWorker：LLM 审批建议
@@ -65,7 +66,7 @@ Spring Boot REST API
           |
           +-- Qdrant：政策分片向量和检索 Payload
           |
-          +-- DeepSeek：三个 LLM Worker
+          +-- DeepSeek：四个 LLM Worker
           +-- DashScope：text-embedding-v4
           +-- 百度千帆：DeepSeek-OCR
 ```
@@ -90,12 +91,15 @@ Spring Boot REST API
 申请与材料
    |
    v
-DocumentIntakeAgent
+DocumentIntakeTool
    |
    +---- 材料缺失 ----------> 等待补件
    |
    v
-FraudRiskAgent + RepaymentCapacityAgent
+DocumentAnalysisWorker（LLM）
+   |
+   v
+FraudRiskTool + RepaymentCapacityCalculator
    |
    v
 RiskWorker（LLM + Qdrant 政策检索）
@@ -358,7 +362,7 @@ QDRANT_POLICY_COLLECTION=credit_policy_chunks_v4
 | `DB_URL` | 是 | MySQL JDBC 地址 |
 | `DB_USERNAME` | 是 | MySQL 用户名 |
 | `DB_PASSWORD` | 是 | MySQL 密码 |
-| `LLM_ENABLED` | 建议 | 是否启用三个 LLM Worker |
+| `LLM_ENABLED` | 建议 | 是否启用四个 LLM Worker |
 | `DEEPSEEK_API_KEY` | 启用 LLM 时 | DeepSeek API Key |
 | `DEEPSEEK_BASE_URL` | 否 | 默认 `https://api.deepseek.com` |
 | `DEEPSEEK_MODEL` | 否 | DeepSeek 模型名称 |
