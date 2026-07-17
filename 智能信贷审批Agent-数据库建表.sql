@@ -1,3 +1,30 @@
+-- 智能信贷审批系统 MySQL 8 初始化脚本
+-- 用于新库首次初始化；生产环境请使用 Flyway/Liquibase 管理版本，且不要保留演示密码。
+CREATE DATABASE IF NOT EXISTS financial_crisis
+    DEFAULT CHARACTER SET utf8mb4
+    DEFAULT COLLATE utf8mb4_0900_ai_ci;
+USE financial_crisis;
+
+CREATE TABLE IF NOT EXISTS system_role (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '角色ID',
+    role_code VARCHAR(32) NOT NULL COMMENT '角色编码',
+    role_name VARCHAR(64) NOT NULL COMMENT '角色名称',
+    role_description VARCHAR(255) DEFAULT NULL COMMENT '角色说明',
+    role_status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/DISABLED',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_system_role_code (role_code)
+) COMMENT='系统角色表';
+
+INSERT INTO system_role (role_code, role_name, role_description, role_status) VALUES
+    ('ADMIN', '系统管理员', '管理人工复核、政策知识库和审计数据', 'ACTIVE'),
+    ('USER', '贷款客户', '提交贷款申请、材料并查询本人申请', 'ACTIVE'),
+    ('REVIEWER', '信贷复核员', '处理 Agent 转入的人工复核工单', 'ACTIVE')
+ON DUPLICATE KEY UPDATE
+    role_name = VALUES(role_name),
+    role_description = VALUES(role_description),
+    role_status = VALUES(role_status);
+
 CREATE TABLE system_account (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '账号ID',
     username VARCHAR(64) NOT NULL COMMENT '登录账号',
@@ -20,7 +47,52 @@ INSERT INTO system_account (
     account_status
 ) VALUES
     ('admin', SHA2('admin123', 256), 'ADMIN', '系统管理员', 'ACTIVE'),
-    ('user', SHA2('user123', 256), 'USER', '贷款客户', 'ACTIVE');
+    ('user', SHA2('user123', 256), 'USER', '贷款客户', 'ACTIVE'),
+    ('reviewer', SHA2('reviewer123', 256), 'REVIEWER', '信贷复核员', 'ACTIVE')
+ON DUPLICATE KEY UPDATE
+    password_hash = VALUES(password_hash),
+    role_code = VALUES(role_code),
+    display_name = VALUES(display_name),
+    account_status = VALUES(account_status);
+
+-- 精确名单必须放在关系数据库中查询，不使用向量相似度判断身份证、手机号等是否命中。
+CREATE TABLE risk_blacklist (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '名单ID',
+    subject_type VARCHAR(32) NOT NULL COMMENT 'ID_CARD/MOBILE/DEVICE/BANK_CARD',
+    subject_hash CHAR(64) NOT NULL COMMENT '规范化值的SHA-256摘要，不保存敏感信息明文',
+    risk_level VARCHAR(16) NOT NULL DEFAULT 'HIGH' COMMENT '风险等级',
+    reason_code VARCHAR(64) NOT NULL COMMENT '原因码',
+    source VARCHAR(64) NOT NULL COMMENT '名单来源',
+    status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE/INACTIVE',
+    effective_from DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '生效时间',
+    effective_to DATETIME DEFAULT NULL COMMENT '失效时间',
+    created_by VARCHAR(64) DEFAULT NULL COMMENT '创建人',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_blacklist_subject (subject_type, subject_hash, source),
+    KEY idx_blacklist_lookup (subject_type, subject_hash, status, effective_from, effective_to)
+) COMMENT='精确风险黑名单';
+
+-- MySQL 保存政策主数据和同步状态，政策分片向量本身存放在 Qdrant。
+CREATE TABLE policy_document (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '政策主键',
+    document_id VARCHAR(64) NOT NULL COMMENT '政策业务ID',
+    title VARCHAR(255) NOT NULL COMMENT '政策标题',
+    version VARCHAR(32) NOT NULL COMMENT '政策版本',
+    product_code VARCHAR(64) NOT NULL COMMENT '适用产品',
+    status VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/ACTIVE/EXPIRED',
+    effective_from DATE NOT NULL COMMENT '生效日期',
+    effective_to DATE DEFAULT NULL COMMENT '失效日期',
+    source_url VARCHAR(512) DEFAULT NULL COMMENT '原始文件地址',
+    content_hash CHAR(64) DEFAULT NULL COMMENT '政策全文SHA-256',
+    qdrant_collection VARCHAR(128) DEFAULT 'credit_policy_chunks' COMMENT 'Qdrant集合名',
+    vector_sync_status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/SYNCED/FAILED',
+    created_by VARCHAR(64) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_policy_version (document_id, version),
+    KEY idx_policy_effective (product_code, status, effective_from, effective_to)
+) COMMENT='政策文档主数据';
 
 CREATE TABLE loan_application (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '申请单ID',
@@ -231,3 +303,94 @@ CREATE TABLE state_transition_log (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     KEY idx_application_id (application_id)
 ) COMMENT='状态流转日志表';
+
+-- 一次审批运行。为后续异步执行、断点恢复和多轮 Agent 返工预留持久化事实层。
+CREATE TABLE approval_run (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '运行ID',
+    run_no VARCHAR(64) NOT NULL COMMENT '运行编号',
+    application_id BIGINT NOT NULL COMMENT '申请单ID',
+    phase VARCHAR(32) NOT NULL COMMENT 'INTAKE/ANALYSIS/DECISION/COMPLETE',
+    flow_status VARCHAR(32) NOT NULL COMMENT '当前工作流状态',
+    revision_count INT NOT NULL DEFAULT 0 COMMENT 'RiskWorker返工次数',
+    run_status VARCHAR(16) NOT NULL DEFAULT 'RUNNING' COMMENT 'RUNNING/SUCCESS/FAILED/MANUAL',
+    current_agent VARCHAR(64) DEFAULT NULL COMMENT '当前Agent',
+    error_message TEXT DEFAULT NULL COMMENT '失败原因',
+    started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    finished_at DATETIME DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_approval_run_no (run_no),
+    KEY idx_approval_run_application (application_id, created_at),
+    KEY idx_approval_run_status (run_status, updated_at)
+) COMMENT='审批运行实例';
+
+-- RiskReport、ReviewReport、DecisionProposal 使用追加版本，Agent 不能覆盖其他 Agent 的工件。
+CREATE TABLE agent_artifact (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '工件ID',
+    run_id BIGINT NOT NULL COMMENT '运行ID',
+    application_id BIGINT NOT NULL COMMENT '申请单ID',
+    artifact_type VARCHAR(32) NOT NULL COMMENT 'RISK_REPORT/REVIEW_REPORT/DECISION_PROPOSAL',
+    artifact_version INT NOT NULL COMMENT '工件版本',
+    agent_name VARCHAR(64) NOT NULL COMMENT '创建Agent',
+    content_json JSON NOT NULL COMMENT '结构化工件内容',
+    based_on_artifact_ids JSON DEFAULT NULL COMMENT '依赖的上游工件ID',
+    model_name VARCHAR(64) DEFAULT NULL,
+    prompt_version VARCHAR(32) DEFAULT NULL,
+    content_hash CHAR(64) DEFAULT NULL COMMENT '内容摘要，防止审计数据被静默修改',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_agent_artifact_version (run_id, artifact_type, artifact_version),
+    KEY idx_agent_artifact_application (application_id, created_at)
+) COMMENT='Agent结构化共享工件';
+
+CREATE TABLE agent_feedback (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '反馈ID',
+    run_id BIGINT NOT NULL COMMENT '运行ID',
+    application_id BIGINT NOT NULL COMMENT '申请单ID',
+    author_agent VARCHAR(64) NOT NULL COMMENT '反馈Agent',
+    target_agent VARCHAR(64) NOT NULL COMMENT '目标Agent',
+    target_artifact_id BIGINT NOT NULL COMMENT '被审查工件ID',
+    feedback_type VARCHAR(32) NOT NULL COMMENT 'CONFLICT/MISSING_EVIDENCE/REVISION',
+    feedback_json JSON NOT NULL COMMENT '结构化问题和返工指令',
+    requested_action VARCHAR(32) NOT NULL COMMENT 'ACCEPT/REVISE/MANUAL_REVIEW',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_agent_feedback_target (run_id, target_agent, created_at)
+) COMMENT='Agent间结构化反馈';
+
+CREATE TABLE agent_checkpoint (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '检查点ID',
+    run_id BIGINT NOT NULL COMMENT '运行ID',
+    application_id BIGINT NOT NULL COMMENT '申请单ID',
+    agent_name VARCHAR(64) NOT NULL COMMENT 'Agent名称',
+    step_name VARCHAR(64) NOT NULL COMMENT '步骤名称',
+    iteration_no INT NOT NULL DEFAULT 1 COMMENT '迭代次数',
+    checkpoint_status VARCHAR(16) NOT NULL COMMENT 'SUCCESS/FAILED',
+    state_json JSON DEFAULT NULL COMMENT '恢复所需的最小状态',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_agent_checkpoint_step (run_id, agent_name, step_name, iteration_no),
+    KEY idx_agent_checkpoint_run (run_id, created_at)
+) COMMENT='Agent断点恢复记录';
+
+CREATE TABLE policy_retrieval_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '检索日志ID',
+    run_id BIGINT DEFAULT NULL COMMENT '运行ID',
+    application_id BIGINT NOT NULL COMMENT '申请单ID',
+    agent_name VARCHAR(64) NOT NULL COMMENT '调用Agent',
+    query_text VARCHAR(1000) NOT NULL COMMENT '脱敏后的检索问题',
+    product_code VARCHAR(64) DEFAULT NULL,
+    qdrant_collection VARCHAR(128) NOT NULL,
+    result_chunks_json JSON DEFAULT NULL COMMENT '命中的chunkId和分数',
+    duration_ms BIGINT DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_policy_retrieval_application (application_id, created_at)
+) COMMENT='Qdrant政策检索审计日志';
+
+-- 可选演示黑名单：仅使用哈希值，测试时可通过 SHA2('原始值', 256) 精确查询。
+INSERT INTO risk_blacklist
+    (subject_type, subject_hash, risk_level, reason_code, source, status, created_by)
+VALUES
+    ('ID_CARD', SHA2('310101199001019999', 256), 'HIGH', 'KNOWN_FRAUD_IDENTITY', 'DEMO', 'ACTIVE', 'admin'),
+    ('MOBILE', SHA2('13900000000', 256), 'HIGH', 'KNOWN_FRAUD_MOBILE', 'DEMO', 'ACTIVE', 'admin')
+ON DUPLICATE KEY UPDATE
+    risk_level = VALUES(risk_level),
+    reason_code = VALUES(reason_code),
+    status = VALUES(status);

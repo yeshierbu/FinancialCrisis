@@ -2,7 +2,7 @@ spring:
   application:
     name: financial-crisis
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/financical?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/financial_crisis?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
     driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:yseb2260602581}
@@ -40,3 +40,15 @@ llm:
   base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
   model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
   timeout-seconds: ${LLM_TIMEOUT_SECONDS:45}
+
+knowledge:
+  # 未配置 Embedding Key 时关闭政策 RAG；MySQL 审批主流程仍可正常启动。
+  enabled: ${KNOWLEDGE_ENABLED:false}
+  embedding:
+    api-key: ${EMBEDDING_API_KEY:}
+    base-url: ${EMBEDDING_BASE_URL:https://api.openai.com/v1}
+    model: ${EMBEDDING_MODEL:text-embedding-3-small}
+  qdrant:
+    url: ${QDRANT_URL:http://localhost:6333}
+    api-key: ${QDRANT_API_KEY:}
+    collection: ${QDRANT_POLICY_COLLECTION:credit_policy_chunks}

@@ -1,15 +1,18 @@
 package com.erbu.financialcrisis.service.impl;
 
-import com.erbu.financialcrisis.agent.ComplianceDecisionAgent;
-import com.erbu.financialcrisis.agent.ApprovalCriticAgent;
 import com.erbu.financialcrisis.agent.DocumentIntakeAgent;
 import com.erbu.financialcrisis.agent.FraudRiskAgent;
-import com.erbu.financialcrisis.agent.LlmApprovalAgent;
 import com.erbu.financialcrisis.agent.RepaymentCapacityAgent;
+import com.erbu.financialcrisis.agent.artifact.DecisionProposal;
+import com.erbu.financialcrisis.agent.artifact.ReviewReport;
+import com.erbu.financialcrisis.agent.artifact.RiskReport;
 import com.erbu.financialcrisis.agent.collaboration.AgentFinding;
 import com.erbu.financialcrisis.agent.collaboration.ApprovalCaseContext;
+import com.erbu.financialcrisis.agent.guard.PolicyGuard;
 import com.erbu.financialcrisis.agent.result.DocumentIntakeResult;
-import com.erbu.financialcrisis.agent.result.PolicyReviewResult;
+import com.erbu.financialcrisis.agent.worker.DecisionWorker;
+import com.erbu.financialcrisis.agent.worker.ReviewWorker;
+import com.erbu.financialcrisis.agent.worker.RiskWorker;
 import com.erbu.financialcrisis.domain.entity.AgentTaskLog;
 import com.erbu.financialcrisis.domain.entity.ApprovalDecision;
 import com.erbu.financialcrisis.domain.entity.FraudRiskResult;
@@ -46,28 +49,31 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
     private final DocumentIntakeAgent documentIntakeAgent;
     private final FraudRiskAgent fraudRiskAgent;
     private final RepaymentCapacityAgent repaymentCapacityAgent;
-    private final ApprovalCriticAgent approvalCriticAgent;
-    private final LlmApprovalAgent llmApprovalAgent;
-    private final ComplianceDecisionAgent complianceDecisionAgent;
+    private final RiskWorker riskWorker;
+    private final ReviewWorker reviewWorker;
+    private final DecisionWorker decisionWorker;
+    private final PolicyGuard policyGuard;
 
     public AgentOrchestrationServiceImpl(ApprovalStore store,
                                          DocumentIntakeAgent documentIntakeAgent,
                                          FraudRiskAgent fraudRiskAgent,
                                          RepaymentCapacityAgent repaymentCapacityAgent,
-                                         ApprovalCriticAgent approvalCriticAgent,
-                                         LlmApprovalAgent llmApprovalAgent,
-                                         ComplianceDecisionAgent complianceDecisionAgent) {
+                                         RiskWorker riskWorker,
+                                         ReviewWorker reviewWorker,
+                                         DecisionWorker decisionWorker,
+                                         PolicyGuard policyGuard) {
         this.store = store;
         this.documentIntakeAgent = documentIntakeAgent;
         this.fraudRiskAgent = fraudRiskAgent;
         this.repaymentCapacityAgent = repaymentCapacityAgent;
-        this.approvalCriticAgent = approvalCriticAgent;
-        this.llmApprovalAgent = llmApprovalAgent;
-        this.complianceDecisionAgent = complianceDecisionAgent;
+        this.riskWorker = riskWorker;
+        this.reviewWorker = reviewWorker;
+        this.decisionWorker = decisionWorker;
+        this.policyGuard = policyGuard;
     }
 
     /**
-     * 执行一次完整审批：材料检查、风控、偿债分析、交叉审查、DeepSeek 复核和合规决策。
+     * 执行一次完整审批：材料检查、确定性工具测算、风险分析、独立复核、LLM 决策和安全护栏。
      * 任一 Agent 异常都会创建人工复核工单，避免异常情况下自动放款。
      */
     @Override
@@ -181,52 +187,59 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     "风险与偿债能力分析完成"
             );
 
-            PolicyReviewResult policyReviewResult = runAgent(
+            RiskReport riskReport = runAgent(
                     applicationId,
-                    "ApprovalCriticAgent",
-                    "交叉复核多 Agent 结论",
+                    "RiskWorker",
+                    "LLM 综合风险分析与政策检索",
                     "findings=" + context.getFindings().size(),
-                    () -> approvalCriticAgent.review(context, fraudRiskResult, repaymentResult)
+                    () -> riskWorker.analyze(application, fraudRiskResult, repaymentResult,
+                            context.getFindings().stream().map(AgentFinding::getConclusion).toList(), List.of())
             );
             context.addFinding(new AgentFinding(
-                    "ApprovalCriticAgent",
-                    "协作审查",
-                    policyReviewResult.getSummary(),
-                    policyReviewResult.getConfidence(),
-                    policyReviewResult.getEvidence(),
-                    policyReviewResult.getRecommendedAction()
+                    "RiskWorker", "LLM 综合风险分析", riskReport.getSummary(),
+                    riskReport.getConfidence(), riskReport.getEvidence(), riskReport.getRecommendedAction()
             ));
 
-            PolicyReviewResult llmReviewResult = runAgent(
+            RiskReport initialRiskReport = riskReport;
+            ReviewReport reviewReport = runAgent(
                     applicationId,
-                    "LlmApprovalAgent",
-                    "DeepSeek 结构化风险复核",
-                    "model=deepseek-v4-flash/findings=" + context.getFindings().size(),
-                    () -> llmApprovalAgent.review(context, fraudRiskResult, repaymentResult, policyReviewResult)
+                    "ReviewWorker",
+                    "独立 LLM 证据与结论复核",
+                    "riskAction=" + initialRiskReport.getRecommendedAction(),
+                    () -> reviewWorker.review(initialRiskReport, fraudRiskResult, repaymentResult)
             );
+
+            // 复核不通过时只允许一次定向返工，防止 Agent 互相否定形成无限循环。
+            if (!Boolean.TRUE.equals(reviewReport.getAccepted())) {
+                List<String> instructions = reviewReport.getRevisionInstructions() == null
+                        ? List.of("根据复核意见重新核对事实和证据") : reviewReport.getRevisionInstructions();
+                riskReport = runAgent(applicationId, "RiskWorker", "按复核意见返工一次",
+                        "issues=" + instructions.size(),
+                        () -> riskWorker.analyze(application, fraudRiskResult, repaymentResult,
+                                context.getFindings().stream().map(AgentFinding::getConclusion).toList(), instructions));
+                RiskReport revisedRiskReport = riskReport;
+                reviewReport = runAgent(applicationId, "ReviewWorker", "复核返工后的风险报告",
+                        "revision=1", () -> reviewWorker.review(revisedRiskReport, fraudRiskResult, repaymentResult));
+            }
+
             context.addFinding(new AgentFinding(
-                    "LlmApprovalAgent",
-                    "DeepSeek 协作审查",
-                    llmReviewResult.getSummary(),
-                    llmReviewResult.getConfidence(),
-                    llmReviewResult.getEvidence(),
-                    llmReviewResult.getRecommendedAction()
+                    "ReviewWorker", "独立复核", reviewReport.getSummary(),
+                    reviewReport.getConfidence(), reviewReport.getContradictions(), reviewReport.getRecommendedAction()
             ));
 
-            ApprovalDecision decision = runAgent(
+            RiskReport finalRiskReport = riskReport;
+            ReviewReport finalReviewReport = reviewReport;
+            DecisionProposal proposal = runAgent(
                     applicationId,
-                    "ComplianceDecisionAgent",
-                    "合规审批决策",
-                    fraudRiskResult.getRiskLevel() + "/" + repaymentResult.getDti()
-                            + "/llm=" + llmReviewResult.getRecommendedAction(),
-                    () -> complianceDecisionAgent.decide(
-                            application,
-                            documentResult,
-                            fraudRiskResult,
-                            repaymentResult,
-                            llmReviewResult
-                    )
+                    "DecisionWorker",
+                    "LLM 生成最终审批建议",
+                    "risk=" + finalRiskReport.getRecommendedAction()
+                            + "/review=" + finalReviewReport.getRecommendedAction(),
+                    () -> decisionWorker.decide(application, finalRiskReport, finalReviewReport, repaymentResult)
             );
+            ApprovalDecision decision = runAgent(applicationId, "PolicyGuard", "确定性安全护栏",
+                    proposal.getDecision(), () -> policyGuard.validate(application, documentResult,
+                            fraudRiskResult, repaymentResult, finalReviewReport, proposal));
             store.saveApprovalDecision(decision);
             addPolicyHit(applicationId, decision);
             finishByDecision(application, decision, fraudRiskResult);
@@ -261,7 +274,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     "自动审批通过",
                     "AUTO_DECISION_APPROVED",
                     OperatorType.AGENT,
-                    "ComplianceDecisionAgent",
+                    "DecisionWorker",
                     decision.getDecisionExplanation()
             );
             return;
@@ -274,7 +287,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     "自动审批拒绝",
                     "AUTO_DECISION_REJECTED",
                     OperatorType.AGENT,
-                    "ComplianceDecisionAgent",
+                    "DecisionWorker",
                     decision.getDecisionExplanation()
             );
             return;
@@ -292,7 +305,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                 "自动审批转人工复核",
                 "AUTO_DECISION_MANUAL_REVIEW",
                 OperatorType.AGENT,
-                "ComplianceDecisionAgent",
+                "DecisionWorker",
                 decision.getDecisionExplanation()
         );
     }

@@ -52,16 +52,29 @@ class FinancialCrisisApplicationTests {
     private QianfanOcrService qianfanOcrService;
 
     @BeforeEach
-    void mockDeepSeekResponse() {
+    void mockMultiAgentResponses() {
+        // 使用一个包含三个工件字段的 JSON，分别供 Risk、Review、Decision Worker 解析。
+        // Spring Boot 的 ObjectMapper 会忽略当前目标 DTO 不需要的字段。
         String json = """
                 {
-                  "conflictDetected": false,
-                  "needManualReview": false,
+                  "riskLevel": "LOW",
+                  "riskScore": 20,
                   "recommendedAction": "PASS",
+                  "claims": ["工具事实一致，未发现显著风险"],
+                  "missingEvidence": [],
+                  "policyReferences": [],
                   "confidence": 0.95,
-                  "evidence": ["Mocked DeepSeek review passed"],
-                  "summary": "Mocked DeepSeek structured review",
-                  "source": "TEST_DEEPSEEK"
+                  "evidence": ["fraud-tool-result", "repayment-tool-result"],
+                  "summary": "Mocked multi-agent result",
+                  "accepted": true,
+                  "contradictions": [],
+                  "unsupportedClaims": [],
+                  "revisionInstructions": [],
+                  "decision": "APPROVED",
+                  "approvedAmount": 50000,
+                  "approvedTerm": 24,
+                  "reasonCodes": ["LOW_RISK"],
+                  "explanation": "风险较低且偿债能力满足要求"
                 }
                 """;
         when(chatLanguageModel.generate(anyList()))

@@ -2,6 +2,11 @@
 
 基于 `Spring Boot + Vue 3 + LangChain4j` 的智能信贷审批演示项目。项目围绕“线上贷款申请 -> 材料提交 -> Agent 自动审批 -> 状态追踪 -> 人工复核/审批报告”的主流程搭建，适合用于智能信贷、风控审批、多 Agent 编排、审计留痕等场景。
 
+审批核心采用三个独立 LLM Worker：`RiskWorker` 进行综合风险分析并检索政策，
+`ReviewWorker` 独立检查证据和冲突（最多触发一次返工），`DecisionWorker` 生成审批建议；
+最后由确定性的 `PolicyGuard` 阻止黑名单、DTI、金额和证据约束被模型绕过。
+业务事实保存在 MySQL，政策语义检索使用 Qdrant。
+
 ## 技术栈
 
 ### 后端
@@ -37,7 +42,7 @@ FinancialCrisis
 ├── src
 │   ├── main
 │   │   ├── java/com/erbu/financialcrisis
-│   │   │   ├── agent               # 审批 Agent：材料、风控、偿债、审查、DeepSeek、合规决策
+│   │   │   ├── agent               # 三个 LLM Worker、结构化工件、工具与安全护栏
 │   │   │   │   └── collaboration    # 共享案件上下文与结构化 Agent 发现
 │   │   │   ├── common              # 统一响应、业务异常
 │   │   │   ├── config              # 全局异常处理、LangChain4j 配置
@@ -127,4 +132,4 @@ http://localhost:5173
 | `DEEPSEEK_MODEL` | 模型名称，默认 `deepseek-v4-flash` |
 | `LLM_TIMEOUT_SECONDS` | 单次 LLM 调用超时时间，默认 45 秒 |
 
-`LangChain4jConfig` 负责创建 DeepSeek 兼容的 `ChatLanguageModel`，`LlmApprovalAgent` 负责拼装最小案件上下文、解析 JSON 结果并执行严格校验。只有 DeepSeek 返回合法结构化结果时，流程才会继续进入自动决策。
+`LangChain4jConfig` 负责创建 DeepSeek 兼容的 `ChatLanguageModel`。三个 Worker 分别使用独立提示词和结构化工件协作；只有模型返回合法 JSON，且最终建议通过 `PolicyGuard`，流程才会进入自动审批结果。
