@@ -18,9 +18,9 @@ public class EmbeddingClient {
     private final boolean enabled;
 
     public EmbeddingClient(RestClient.Builder builder,
-                           @Value("${knowledge.embedding.base-url:https://api.openai.com/v1}") String baseUrl,
+                           @Value("${knowledge.embedding.base-url:https://dashscope.aliyuncs.com/compatible-mode/v1}") String baseUrl,
                            @Value("${knowledge.embedding.api-key:}") String apiKey,
-                           @Value("${knowledge.embedding.model:text-embedding-3-small}") String model,
+                           @Value("${knowledge.embedding.model:text-embedding-v4}") String model,
                            @Value("${knowledge.enabled:false}") boolean enabled) {
         this.restClient = builder.baseUrl(baseUrl).build();
         this.apiKey = apiKey;

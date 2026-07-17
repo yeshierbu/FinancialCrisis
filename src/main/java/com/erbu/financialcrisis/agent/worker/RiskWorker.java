@@ -37,7 +37,8 @@ public class RiskWorker {
                               List<String> revisionInstructions) {
         try {
             List<PolicyEvidence> policies = policySearchTool.search(
-                    "消费贷反欺诈、偿债能力、DTI、自动审批和人工复核政策", "CONSUMER_LOAN");
+                    "消费贷反欺诈、偿债能力、DTI、自动审批和人工复核政策",
+                    application.getProductCode());
             Map<String, Object> input = Map.of(
                     "application", application,
                     "fraudToolResult", fraud,
