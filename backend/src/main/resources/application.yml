@@ -3,12 +3,13 @@ spring:
     name: financial-crisis
   config:
     # 允许 IDEA、Maven 和命令行使用同一份本机配置；文件不存在时仍可正常启动。
-    import: optional:file:.env[.properties]
+    # 兼容从仓库根目录或 backend 目录启动，统一读取根目录 .env。
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/financial_crisis?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
     driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
     username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:yseb2260602581}
+    password: ${DB_PASSWORD:}
   servlet:
     multipart:
       max-file-size: 10MB

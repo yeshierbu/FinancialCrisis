@@ -180,30 +180,21 @@ Qdrant 只保存用于语义检索的政策分片：
 ```text
 FinancialCrisis/
 ├── README.md
-├── pom.xml
 ├── docker-compose.yml                 # Qdrant 容器
-├── 智能信贷审批Agent-数据库建表.sql      # MySQL 8 初始化脚本（23 张表）
-├── src/
-│   ├── main/
-│   │   ├── java/com/erbu/financialcrisis/
-│   │   │   ├── agent/
-│   │   │   │   ├── artifact/          # Agent 结构化输出
-│   │   │   │   ├── collaboration/     # 共享案件上下文
-│   │   │   │   ├── guard/             # 确定性审批护栏
-│   │   │   │   ├── runtime/           # 结构化 LLM 客户端
-│   │   │   │   ├── tool/              # 政策检索工具
-│   │   │   │   └── worker/            # 三个 LLM Worker
-│   │   │   ├── controller/             # REST API
-│   │   │   ├── domain/                 # 实体和枚举
-│   │   │   ├── dto/                    # 请求和响应对象
-│   │   │   ├── knowledge/              # Embedding 与 Qdrant
-│   │   │   ├── mapper/                 # MyBatis Mapper 接口
-│   │   │   ├── service/                # 业务服务
-│   │   │   └── store/                  # 数据持久化门面
-│   │   └── resources/
-│   │       ├── application.yml
-│   │       └── mapper/                 # MyBatis XML
-│   └── test/                            # H2 集成测试和单元测试
+├── backend/                              # Java/Spring Boot 后端
+│   ├── pom.xml
+│   ├── 智能信贷审批Agent-数据库建表.sql  # MySQL 8 初始化脚本（23 张表）
+│   └── src/
+│       ├── main/
+│       │   ├── java/com/erbu/financialcrisis/
+│       │   │   ├── agent/          # Agent、共享上下文、Worker 与护栏
+│       │   │   ├── controller/     # REST API
+│       │   │   ├── domain/         # 实体和枚举
+│       │   │   ├── knowledge/      # Embedding 与 Qdrant
+│       │   │   ├── mapper/         # MyBatis Mapper
+│       │   │   └── service/        # 业务服务
+│       │   └── resources/               # 配置和 Mapper XML
+│       └── test/                            # H2 测试
 └── frontend/
     ├── package.json
     ├── vite.config.js
@@ -246,13 +237,13 @@ jdbc:mysql://localhost:3306/financial_crisis
 ### 8.1 安装了 MySQL 命令行客户端
 
 ```bash
-mysql -u root -p < 智能信贷审批Agent-数据库建表.sql
+mysql -u root -p < backend/智能信贷审批Agent-数据库建表.sql
 ```
 
 或者进入 MySQL 后执行：
 
 ```sql
-SOURCE /Users/你的用户名/IdeaProjects/FinancialCrisis/智能信贷审批Agent-数据库建表.sql;
+SOURCE /Users/你的用户名/IdeaProjects/FinancialCrisis/backend/智能信贷审批Agent-数据库建表.sql;
 ```
 
 ### 8.2 MySQL 运行在 Docker 中
@@ -266,7 +257,7 @@ docker ps
 然后执行：
 
 ```bash
-docker exec -i 你的MySQL容器名 mysql -u root -p你的密码 < 智能信贷审批Agent-数据库建表.sql
+docker exec -i 你的MySQL容器名 mysql -u root -p你的密码 < backend/智能信贷审批Agent-数据库建表.sql
 ```
 
 ### 8.3 验证数据库
@@ -326,7 +317,7 @@ Spring Boot 会自动加载项目根目录下的 `.env`：
 ```yaml
 spring:
   config:
-    import: optional:file:.env[.properties]
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
 ```
 
 在项目根目录创建 `.env`，每行使用 `KEY=value`，不要写 `export`，等号两边不要留空格：
@@ -385,9 +376,10 @@ QDRANT_POLICY_COLLECTION=credit_policy_chunks_v4
 
 ## 11. 启动后端
 
-在项目根目录运行：
+进入后端目录运行：
 
 ```bash
+cd backend
 mvn spring-boot:run
 ```
 
@@ -413,6 +405,7 @@ curl http://localhost:8080/actuator/health
 也可以先构建再运行：
 
 ```bash
+cd backend
 mvn clean package
 java -jar target/financial-crisis-0.0.1-SNAPSHOT.jar
 ```
@@ -591,6 +584,7 @@ npm run build
 执行全部后端测试：
 
 ```bash
+cd backend
 mvn test
 ```
 
@@ -608,8 +602,9 @@ mvn test
 同时检查后端打包和前端构建：
 
 ```bash
+cd backend
 mvn -DskipTests package
-cd frontend
+cd ../frontend
 npm run build
 ```
 
@@ -629,6 +624,7 @@ kill 进程PID
 或者临时更换端口：
 
 ```bash
+cd backend
 mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8081
 ```
 
