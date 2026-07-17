@@ -8,7 +8,6 @@ import com.erbu.financialcrisis.dto.request.CreateLoanApplicationRequest;
 import com.erbu.financialcrisis.dto.response.ApplicationStatusResponse;
 import com.erbu.financialcrisis.dto.response.LoanApplicationResponse;
 import com.erbu.financialcrisis.dto.response.StatusTimelineResponse;
-import com.erbu.financialcrisis.service.AgentOrchestrationService;
 import com.erbu.financialcrisis.service.LoanApplicationService;
 import com.erbu.financialcrisis.store.ApprovalStore;
 import org.springframework.stereotype.Service;
@@ -23,19 +22,16 @@ import java.util.UUID;
 /**
  * 贷款申请业务服务实现。
  *
- * <p>负责申请主表的创建与查询，并通过审批编排服务同步启动多 Agent 审批流程。
+ * <p>负责申请主表的创建与查询。创建后快速返回 SUBMITTED，
+ * 材料 OCR 成功后由 RabbitMQ 后台启动多 Agent 审批。
  * 数据由 ApprovalStore 统一持久化到 MySQL。</p>
  */
 @Service
 public class LoanApplicationServiceImpl implements LoanApplicationService {
 
     private final ApprovalStore store;
-    private final AgentOrchestrationService agentOrchestrationService;
-
-    public LoanApplicationServiceImpl(ApprovalStore store,
-                                      AgentOrchestrationService agentOrchestrationService) {
+    public LoanApplicationServiceImpl(ApprovalStore store) {
         this.store = store;
-        this.agentOrchestrationService = agentOrchestrationService;
     }
 
     @Override
@@ -73,12 +69,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 "用户提交贷款申请"
         );
 
-        /*
-         * 文档建议创建申请后立即启动审批编排。当前没有异步队列，所以采用同步调用：
-         * 如果资料还没上传，编排会把申请推进到 DOCUMENT_PENDING，前端即可展示补件状态。
-         */
-        agentOrchestrationService.startApprovalFlow(application.getApplicationId());
-        return toResponse(store.getApplicationOrThrow(application.getApplicationId()));
+        return toResponse(application);
     }
 
     @Override

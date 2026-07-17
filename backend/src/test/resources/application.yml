@@ -13,6 +13,10 @@ spring:
 knowledge:
   enabled: false
 
+approval:
+  messaging:
+    enabled: false
+
 # test resources 中的 application.yml 会优先于主配置，因此显式保留 Mapper 路径。
 mybatis:
   mapper-locations: classpath:/mapper/*.xml

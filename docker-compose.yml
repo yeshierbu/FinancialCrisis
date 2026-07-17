@@ -8,5 +8,22 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  rabbitmq:
+    # 已经单独部署 RabbitMQ 时不要启用此 profile，应用会直接连接 RABBITMQ_HOST。
+    profiles: ["local-rabbitmq"]
+    image: rabbitmq:3.13-management
+    container_name: financial-crisis-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-financial_app}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-change-me-in-env}
+      RABBITMQ_DEFAULT_VHOST: /financial-crisis
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
 volumes:
   qdrant_data:
+  rabbitmq_data:

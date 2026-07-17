@@ -79,7 +79,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
 
     /**
      * 执行一次完整审批：材料检查、确定性工具测算、风险分析、独立复核、LLM 决策和安全护栏。
-     * 任一 Agent 异常都会创建人工复核工单，避免异常情况下自动放款。
+     * 技术异常向上抛给消息消费者，由 RabbitMQ 延迟重试；重试耗尽后再转人工审核。
      */
     @Override
     @Transactional
@@ -263,26 +263,33 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
             addPolicyHit(applicationId, decision);
             finishByDecision(application, decision, fraudRiskResult);
         } catch (RuntimeException ex) {
-            /*
-             * 审批链路中 Agent 或工具失败时，第一版统一转人工复核。注意这里没有自动通过，
-             * 因为金融审批里的降级兜底必须偏保守。
-             */
-            ManualReviewTicket ticket = createOrUpdateReviewTicket(
-                    application,
-                    "AUTO_FLOW_EXCEPTION",
-                    "自动审批异常，已转人工复核：" + ex.getMessage()
-            );
-            store.saveReviewTicket(ticket);
-            store.changeStatus(
-                    application,
-                    ApplicationStatus.MANUAL_REVIEW,
-                    "自动审批异常，等待人工复核",
-                    "AUTO_FLOW_EXCEPTION",
-                    OperatorType.SYSTEM,
-                    "orchestrator",
-                    ex.getMessage()
-            );
+            // 必须抛出异常使当前事务回滚，否则消费者无法判断本次审批是否需要重试。
+            throw new IllegalStateException("自动审批执行失败：" + ex.getMessage(), ex);
         }
+    }
+
+    @Override
+    @Transactional
+    public void moveToManualReview(Long applicationId, String reason) {
+        LoanApplication application = store.getApplicationOrThrow(applicationId);
+        if (application.getStatus() == ApplicationStatus.APPROVED
+                || application.getStatus() == ApplicationStatus.REJECTED
+                || application.getStatus() == ApplicationStatus.ARCHIVED) {
+            return;
+        }
+        String safeReason = reason == null || reason.isBlank() ? "自动审批多次执行失败" : reason;
+        ManualReviewTicket ticket = createOrUpdateReviewTicket(
+                application, "AUTO_FLOW_RETRY_EXHAUSTED", safeReason);
+        store.saveReviewTicket(ticket);
+        store.changeStatus(
+                application,
+                ApplicationStatus.MANUAL_REVIEW,
+                "自动审批重试耗尽，等待人工复核",
+                "AUTO_FLOW_RETRY_EXHAUSTED",
+                OperatorType.SYSTEM,
+                "approval-consumer",
+                safeReason
+        );
     }
 
     private void finishByDecision(LoanApplication application, ApprovalDecision decision, FraudRiskResult fraudRiskResult) {

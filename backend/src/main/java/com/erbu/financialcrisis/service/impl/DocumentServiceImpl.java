@@ -1,5 +1,6 @@
 package com.erbu.financialcrisis.service.impl;
 
+import com.erbu.financialcrisis.agent.tool.DocumentIntakeTool;
 import com.erbu.financialcrisis.common.BusinessException;
 import com.erbu.financialcrisis.domain.entity.LoanApplication;
 import com.erbu.financialcrisis.domain.entity.UploadedDocument;
@@ -11,7 +12,7 @@ import com.erbu.financialcrisis.dto.request.SupplementDocumentRequest;
 import com.erbu.financialcrisis.dto.request.SupplementRequest;
 import com.erbu.financialcrisis.dto.response.SupplementResponse;
 import com.erbu.financialcrisis.dto.response.UploadedDocumentResponse;
-import com.erbu.financialcrisis.service.AgentOrchestrationService;
+import com.erbu.financialcrisis.service.ApprovalTaskService;
 import com.erbu.financialcrisis.service.DocumentService;
 import com.erbu.financialcrisis.service.QianfanOcrService;
 import com.erbu.financialcrisis.store.ApprovalStore;
@@ -47,15 +48,18 @@ public class DocumentServiceImpl implements DocumentService {
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png");
 
     private final ApprovalStore store;
-    private final AgentOrchestrationService agentOrchestrationService;
+    private final ApprovalTaskService approvalTaskService;
     private final QianfanOcrService qianfanOcrService;
+    private final DocumentIntakeTool documentIntakeTool;
 
     public DocumentServiceImpl(ApprovalStore store,
-                               AgentOrchestrationService agentOrchestrationService,
-                               QianfanOcrService qianfanOcrService) {
+                               ApprovalTaskService approvalTaskService,
+                               QianfanOcrService qianfanOcrService,
+                               DocumentIntakeTool documentIntakeTool) {
         this.store = store;
-        this.agentOrchestrationService = agentOrchestrationService;
+        this.approvalTaskService = approvalTaskService;
         this.qianfanOcrService = qianfanOcrService;
+        this.documentIntakeTool = documentIntakeTool;
     }
 
     @Override
@@ -113,10 +117,20 @@ public class DocumentServiceImpl implements DocumentService {
             return toResponse(document);
         }
 
-        /*
-         * 文件上传后立即重新拉起审批流。资料不齐时流程会再次停在 DOCUMENT_PENDING；
-         * 资料齐全时则会继续进入风控、偿债能力和合规决策。
-         */
+        if (!documentIntakeTool.isReadyForApproval(store.listDocuments(applicationId))) {
+            store.changeStatus(
+                    application,
+                    ApplicationStatus.DOCUMENT_PENDING,
+                    "材料已接收，等待其余必需材料",
+                    "WAITING_REQUIRED_DOCUMENTS",
+                    OperatorType.USER,
+                    application.getApplicantName(),
+                    "上传材料：" + documentType
+            );
+            return toResponse(document);
+        }
+
+        // 最低材料集合全部 OCR 成功后才创建一条 Outbox 任务，避免连续上传期间与消费者竞争。
         store.changeStatus(
                 application,
                 ApplicationStatus.SUBMITTED,
@@ -126,7 +140,7 @@ public class DocumentServiceImpl implements DocumentService {
                 application.getApplicantName(),
                 "上传材料：" + documentType
         );
-        agentOrchestrationService.startApprovalFlow(applicationId);
+        approvalTaskService.submit(applicationId);
 
         return toResponse(document);
     }
@@ -191,17 +205,17 @@ public class DocumentServiceImpl implements DocumentService {
                 application.getApplicantName(),
                 request.getRemark()
         );
-        agentOrchestrationService.startApprovalFlow(applicationId);
+        approvalTaskService.submit(applicationId);
 
         LoanApplication latest = store.getApplicationOrThrow(applicationId);
         return new SupplementResponse(latest.getApplicationId(), latest.getStatus(), latest.getCurrentStep());
     }
 
     private void assertDocumentUploadAllowed(LoanApplication application) {
-        if (application.getStatus() == ApplicationStatus.APPROVED
-                || application.getStatus() == ApplicationStatus.REJECTED
-                || application.getStatus() == ApplicationStatus.ARCHIVED
-                || application.getStatus() == ApplicationStatus.MANUAL_REVIEW) {
+        // 审批消费者运行期间禁止并发改材料，避免一次审批读取到前后不一致的文档集合。
+        if (application.getStatus() != ApplicationStatus.SUBMITTED
+                && application.getStatus() != ApplicationStatus.DOCUMENT_PENDING
+                && application.getStatus() != ApplicationStatus.MATERIAL_PENDING) {
             throw new BusinessException(4003, "当前状态不允许上传材料");
         }
     }

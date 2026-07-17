@@ -108,7 +108,7 @@ class FinancialCrisisApplicationTests {
                         .content(createRequest))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.status").value("DOCUMENT_PENDING"))
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

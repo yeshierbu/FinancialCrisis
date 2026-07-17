@@ -2,7 +2,7 @@
 
 一个使用 Java 实现的多 Agent 智能信贷审批项目。系统覆盖贷款申请、材料上传、OCR、风险分析、偿债能力评估、政策知识检索、LLM 独立复核、审批决策、确定性安全护栏以及人工审核等完整流程。
 
-后端使用 Spring Boot 3，业务数据存储在 MySQL，政策文件通过 `text-embedding-v4` 向量化后写入 Qdrant。前端使用 Vue 3，提供客户申请端和管理审核端。
+后端使用 Spring Boot 3，业务数据存储在 MySQL，RabbitMQ 负责异步审批任务，政策文件通过 `text-embedding-v4` 向量化后写入 Qdrant。前端使用 Vue 3，提供客户申请端和管理审核端。
 
 > 当前项目适合本地开发、课程设计和多 Agent 架构演示。登录功能目前是前端演示登录，不应直接用于生产环境。
 
@@ -65,6 +65,7 @@ Spring Boot REST API
           +-- MySQL：申请、风险结果、决策、人工审核、审计日志
           |
           +-- Qdrant：政策分片向量和检索 Payload
+          +-- RabbitMQ：异步审批、延迟重试和死信队列
           |
           +-- DeepSeek：四个 LLM Worker
           +-- DashScope：text-embedding-v4
@@ -184,10 +185,11 @@ Qdrant 只保存用于语义检索的政策分片：
 ```text
 FinancialCrisis/
 ├── README.md
-├── docker-compose.yml                 # Qdrant 容器
+├── docker-compose.yml                 # Qdrant 与 RabbitMQ 容器
 ├── backend/                              # Java/Spring Boot 后端
 │   ├── pom.xml
-│   ├── 智能信贷审批Agent-数据库建表.sql  # MySQL 8 初始化脚本（23 张表）
+│   ├── 智能信贷审批Agent-数据库建表.sql  # MySQL 8 初始化脚本（26 张表）
+│   ├── sql/                              # 已有数据库的增量升级脚本
 │   └── src/
 │       ├── main/
 │       │   ├── java/com/erbu/financialcrisis/
@@ -273,14 +275,34 @@ SELECT COUNT(*) FROM information_schema.tables
 WHERE table_schema = 'financial_crisis';
 ```
 
-初始化脚本当前创建 23 张表，并初始化 `ADMIN`、`USER`、`REVIEWER` 三种角色及演示账号。
+初始化脚本当前创建 26 张表，并初始化 `ADMIN`、`USER`、`REVIEWER` 三种角色及演示账号。已有旧数据库只需执行：
 
-## 9. 启动 Qdrant
+```bash
+mysql -u root -p < backend/sql/V2__rabbitmq_async_approval.sql
+```
+
+## 9. 启动 Qdrant 和 RabbitMQ
 
 项目根目录已经包含 `docker-compose.yml`：
 
+先在根目录 `.env` 中加入 RabbitMQ 本地账号（密码自行设置，应用和 Docker 会读取同一值）：
+
+```properties
+RABBITMQ_USERNAME=financial_app
+RABBITMQ_PASSWORD=替换为强密码
+RABBITMQ_VHOST=/financial-crisis
+```
+
+如果本机还没有 RabbitMQ，由项目同时启动 Qdrant 和 RabbitMQ：
+
 ```bash
-docker compose up -d
+docker compose --profile local-rabbitmq up -d
+```
+
+如果已经像本项目开发机一样单独部署了 `my-rabbitmq`，不要重复创建消息队列，只启动 Qdrant：
+
+```bash
+docker compose up -d qdrant
 ```
 
 检查容器：
@@ -295,12 +317,20 @@ docker compose ps
 curl http://localhost:6333/collections
 ```
 
+RabbitMQ 管理端：
+
+```text
+http://localhost:15672
+```
+
 Qdrant 端口：
 
 | 端口 | 用途 |
 | --- | --- |
 | `6333` | HTTP API，项目默认使用该端口 |
 | `6334` | gRPC API |
+| `5672` | RabbitMQ AMQP，仅绑定本机 |
+| `15672` | RabbitMQ 管理界面，仅绑定本机 |
 
 停止容器但保留数据：
 
@@ -353,6 +383,18 @@ EMBEDDING_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 EMBEDDING_MODEL=text-embedding-v4
 QDRANT_URL=http://localhost:6333
 QDRANT_POLICY_COLLECTION=credit_policy_chunks_v4
+
+# RabbitMQ 异步审批
+APPROVAL_MESSAGING_ENABLED=true
+RABBITMQ_HOST=localhost
+RABBITMQ_PORT=5672
+RABBITMQ_USERNAME=financial_app
+RABBITMQ_PASSWORD=请设置强密码
+RABBITMQ_VHOST=/financial-crisis
+APPROVAL_CONSUMER_CONCURRENCY=2
+APPROVAL_CONSUMER_MAX_CONCURRENCY=4
+APPROVAL_MAX_RETRIES=3
+APPROVAL_RETRY_DELAY_MS=30000
 ```
 
 配置说明：
@@ -373,6 +415,11 @@ QDRANT_POLICY_COLLECTION=credit_policy_chunks_v4
 | `EMBEDDING_MODEL` | 否 | 当前使用 `text-embedding-v4` |
 | `QDRANT_URL` | 启用知识库时 | Qdrant HTTP 地址 |
 | `QDRANT_POLICY_COLLECTION` | 否 | 政策 Collection 名称 |
+| `APPROVAL_MESSAGING_ENABLED` | 是 | 生产建议保持 `true`，测试环境使用同步回退 |
+| `RABBITMQ_USERNAME` | 是 | RabbitMQ 用户名 |
+| `RABBITMQ_PASSWORD` | 是 | RabbitMQ 强密码，必须与 Docker 一致 |
+| `RABBITMQ_VHOST` | 是 | 默认 `/financial-crisis` |
+| `APPROVAL_CONSUMER_MAX_CONCURRENCY` | 否 | 审批最大并发数，默认 4 |
 
 `.env` 已经被 `.gitignore` 忽略。不要将真实 Key 写进 README、源码、提交记录或聊天截图。
 
@@ -496,8 +543,12 @@ npm run build
 1. 使用 `user/user123` 登录。
 2. 填写申请人、身份证号、手机号、金额、期限和就业信息。
 3. 提交贷款申请。
-4. 上传系统要求的申请材料。
-5. 材料满足要求后触发审批编排。
+4. 接口立即返回 `SUBMITTED`，不在 HTTP 线程中执行 Agent。
+5. 上传系统要求的申请材料。
+6. 三种必需材料全部 OCR 成功后，在同一 MySQL 事务中写入一条 `approval_outbox`。
+7. Outbox 发布器将任务发到 RabbitMQ，消费者在后台执行 Agent 审批。
+
+异步链路提供 Publisher Confirm、有界消费并发、eventId 幂等、申请级执行锁、延迟重试与死信队列。
 
 材料类型包括：
 
@@ -515,8 +566,8 @@ npm run build
 以下情况会进入人工审核：
 
 - 自动审批认为需要人工判断。
-- LLM 返回异常或结构化结果不合法。
-- OCR、Embedding、Qdrant 或其他工具失败。
+- LLM 返回异常或结构化结果不合法，并且 RabbitMQ 自动重试达到上限。
+- 审批依赖的外部工具持续失败且自动重试达到上限。
 - 复核后仍存在证据冲突。
 - `PolicyGuard` 判定不能自动完成审批。
 

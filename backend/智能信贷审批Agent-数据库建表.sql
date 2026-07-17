@@ -304,6 +304,53 @@ CREATE TABLE state_transition_log (
     KEY idx_application_id (application_id)
 ) COMMENT='状态流转日志表';
 
+-- 申请与待发送事件在同一 MySQL 事务中落库，避免数据成功但 RabbitMQ 消息丢失。
+CREATE TABLE approval_outbox (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    event_id VARCHAR(64) NOT NULL,
+    application_id BIGINT NOT NULL,
+    event_type VARCHAR(64) NOT NULL,
+    routing_key VARCHAR(128) NOT NULL,
+    payload_json JSON NOT NULL,
+    publish_status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/PUBLISHING/RETRY/PUBLISHED/CONSUMED',
+    retry_count INT NOT NULL DEFAULT 0,
+    next_retry_at DATETIME DEFAULT NULL,
+    published_at DATETIME DEFAULT NULL,
+    last_error VARCHAR(1000) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_approval_outbox_event (event_id),
+    KEY idx_approval_outbox_pending (publish_status, next_retry_at, created_at),
+    KEY idx_approval_outbox_application (application_id)
+) COMMENT='审批事件Outbox';
+
+CREATE TABLE approval_message_consume_log (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    event_id VARCHAR(64) NOT NULL,
+    application_id BIGINT NOT NULL,
+    consume_status VARCHAR(16) NOT NULL COMMENT 'PROCESSING/RETRY/FAILED/COMPLETED',
+    consumer_name VARCHAR(64) NOT NULL,
+    retry_count INT NOT NULL DEFAULT 0,
+    started_at DATETIME DEFAULT NULL,
+    completed_at DATETIME DEFAULT NULL,
+    last_error VARCHAR(1000) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_consume_event (event_id),
+    KEY idx_consume_application (application_id),
+    KEY idx_consume_status (consume_status, updated_at)
+) COMMENT='RabbitMQ审批消息幂等日志';
+
+-- 不同 eventId 也不允许并发执行同一申请，超时锁由下一个消费者清理。
+CREATE TABLE approval_execution_lock (
+    application_id BIGINT PRIMARY KEY,
+    event_id VARCHAR(64) NOT NULL,
+    locked_by VARCHAR(64) NOT NULL,
+    locked_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    KEY idx_approval_lock_expire (expires_at)
+) COMMENT='审批申请执行锁';
+
 -- 一次审批运行。为后续异步执行、断点恢复和多轮 Agent 返工预留持久化事实层。
 CREATE TABLE approval_run (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '运行ID',

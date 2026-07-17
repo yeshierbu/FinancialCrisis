@@ -8,4 +8,7 @@ public interface AgentOrchestrationService {
 
     /** 按既定顺序执行各专业 Agent，并持久化过程与结果。 */
     void startApprovalFlow(Long applicationId);
+
+    /** 消息重试耗尽后安全降级为人工审核。 */
+    void moveToManualReview(Long applicationId, String reason);
 }
