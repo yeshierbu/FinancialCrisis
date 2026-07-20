@@ -15,7 +15,7 @@ import java.util.List;
 @Component
 public class StructuredLlmClient {
     private final ChatLanguageModel model;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper;    //序列化/反序列化类
     private final String apiKey;
     private final boolean enabled;
 
@@ -37,6 +37,8 @@ public class StructuredLlmClient {
                     SystemMessage.from(systemPrompt + " 必须只返回合法 JSON，不要使用 Markdown。"),
                     UserMessage.from(userPrompt)
             ));
+
+
             String content = response == null || response.content() == null
                     ? null : response.content().text();
             if (content == null || content.isBlank()) {

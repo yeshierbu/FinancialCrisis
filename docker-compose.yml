@@ -27,3 +27,5 @@ services:
 volumes:
   qdrant_data:
   rabbitmq_data:
+#启动命令
+#docker compose --profile local-rabbitmq up -d rabbitmq

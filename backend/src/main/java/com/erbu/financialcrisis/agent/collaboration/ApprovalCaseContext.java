@@ -26,7 +26,7 @@ public class ApprovalCaseContext {
     public void addFinding(AgentFinding finding) {
         if (finding != null) {
             findings.add(finding);
-        }
+                              }
     }
 
     public List<AgentFinding> getFindings() {
