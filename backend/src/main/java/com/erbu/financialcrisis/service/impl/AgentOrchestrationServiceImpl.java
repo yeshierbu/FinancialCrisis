@@ -58,6 +58,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
     private final DecisionWorker decisionWorker;
     private final PolicyGuard policyGuard;
     private final ApprovalCheckpointService checkpoints;
+    private final ApprovalSingleStepExecutor singleStepExecutor;
 
     public AgentOrchestrationServiceImpl(ApprovalStore store,
                                          DocumentIntakeTool documentIntakeTool,
@@ -67,7 +68,8 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                                          RiskWorker riskWorker,
                                          ReviewWorker reviewWorker,
                                          DecisionWorker decisionWorker,
-                                         PolicyGuard policyGuard, ApprovalCheckpointService checkpoints) {
+                                         PolicyGuard policyGuard, ApprovalCheckpointService checkpoints,
+                                         ApprovalSingleStepExecutor singleStepExecutor) {
         this.store = store;
         this.documentIntakeTool = documentIntakeTool;
         this.fraudRiskTool = fraudRiskTool;
@@ -78,6 +80,13 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
         this.decisionWorker = decisionWorker;
         this.policyGuard = policyGuard;
         this.checkpoints = checkpoints;
+        this.singleStepExecutor = singleStepExecutor;
+    }
+
+    @Override
+    public com.erbu.financialcrisis.domain.enums.ApprovalStep executeStep(
+            Long applicationId, com.erbu.financialcrisis.domain.enums.ApprovalStep step) {
+        return singleStepExecutor.execute(applicationId, step);
     }
 
     /**
