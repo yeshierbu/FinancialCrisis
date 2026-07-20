@@ -30,6 +30,7 @@ public class LoanApplication {
     private ApplicationStatus status;
     private String currentStep;
     private String channelCode;
+    private String ownerUsername;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

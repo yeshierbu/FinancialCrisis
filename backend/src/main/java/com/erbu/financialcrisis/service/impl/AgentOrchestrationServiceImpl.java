@@ -29,6 +29,7 @@ import com.erbu.financialcrisis.domain.enums.LogStatus;
 import com.erbu.financialcrisis.domain.enums.OperatorType;
 import com.erbu.financialcrisis.domain.enums.ReviewStatus;
 import com.erbu.financialcrisis.service.AgentOrchestrationService;
+import com.erbu.financialcrisis.service.ApprovalCheckpointService;
 import com.erbu.financialcrisis.store.ApprovalStore;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +57,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
     private final ReviewWorker reviewWorker;
     private final DecisionWorker decisionWorker;
     private final PolicyGuard policyGuard;
+    private final ApprovalCheckpointService checkpoints;
 
     public AgentOrchestrationServiceImpl(ApprovalStore store,
                                          DocumentIntakeTool documentIntakeTool,
@@ -65,7 +67,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                                          RiskWorker riskWorker,
                                          ReviewWorker reviewWorker,
                                          DecisionWorker decisionWorker,
-                                         PolicyGuard policyGuard) {
+                                         PolicyGuard policyGuard, ApprovalCheckpointService checkpoints) {
         this.store = store;
         this.documentIntakeTool = documentIntakeTool;
         this.fraudRiskTool = fraudRiskTool;
@@ -75,6 +77,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
         this.reviewWorker = reviewWorker;
         this.decisionWorker = decisionWorker;
         this.policyGuard = policyGuard;
+        this.checkpoints = checkpoints;
     }
 
     /**
@@ -82,9 +85,12 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
      * 技术异常向上抛给消息消费者，由 RabbitMQ 延迟重试；重试耗尽后再转人工审核。
      */
     @Override
-    @Transactional
     public void startApprovalFlow(Long applicationId) {
         LoanApplication application = store.getApplicationOrThrow(applicationId);
+        if (application.getStatus() == ApplicationStatus.APPROVED
+                || application.getStatus() == ApplicationStatus.REJECTED
+                || application.getStatus() == ApplicationStatus.ARCHIVED
+                || application.getStatus() == ApplicationStatus.MANUAL_REVIEW) return;
         /**
          * 创建本次审判流程的共享上下文，绑定当前的applicationId,后续各个Agent可以往这个上下文区域写发现
          */
@@ -94,7 +100,9 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
          *
          */
         try {
-            store.changeStatus(
+            if (application.getStatus() == ApplicationStatus.SUBMITTED
+                    || application.getStatus() == ApplicationStatus.DOCUMENT_PENDING
+                    || application.getStatus() == ApplicationStatus.MATERIAL_PENDING) store.changeStatus(
                     application,
                     ApplicationStatus.OCR_PARSING,
                     "材料采集工具校验申请材料",
@@ -135,7 +143,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                 return;
             }
 
-            store.changeStatus(
+            if (application.getStatus() == ApplicationStatus.OCR_PARSING) store.changeStatus(
                     application,
                     ApplicationStatus.RISK_ANALYZING,
                     "反欺诈风控与偿债能力分析中",
@@ -145,13 +153,14 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     documentResult.getSummary()
             );
 
-            DocumentAnalysisReport documentAnalysis = runAgent(
+            DocumentAnalysisReport documentAnalysis = checkpoints.restoreOrExecute(applicationId, "DOCUMENT_ANALYSIS",
+                    DocumentAnalysisReport.class, () -> runAgent(
                     applicationId,
                     "DocumentAnalysisWorker",
                     "LLM 理解 OCR 文本与材料一致性",
                     "documents=" + documents.size(),
                     () -> documentAnalysisWorker.analyze(application, documents, documentResult)
-            );
+            ));
             context.addFinding(new AgentFinding(
                     "DocumentAnalysisWorker", "LLM 材料分析", documentAnalysis.getSummary(),
                     documentAnalysis.getConfidence(),
@@ -196,7 +205,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                             ? "MANUAL_REVIEW" : "CONTINUE"
             ));
 
-            store.changeStatus(
+            if (application.getStatus() == ApplicationStatus.RISK_ANALYZING) store.changeStatus(
                     application,
                     ApplicationStatus.DECISION_PENDING,
                     "协作审查与合规决策 Agent 汇总审批结论",
@@ -206,39 +215,43 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
                     "风险与偿债能力分析完成"
             );
 
-            RiskReport riskReport = runAgent(
+            RiskReport riskReport = checkpoints.restoreOrExecute(applicationId, "RISK_ANALYSIS",
+                    RiskReport.class, () -> runAgent(
                     applicationId,
                     "RiskWorker",
                     "LLM 综合风险分析与政策检索",
                     "findings=" + context.getFindings().size(),
                     () -> riskWorker.analyze(application, fraudRiskResult, repaymentResult,
                             context.getFindings().stream().map(AgentFinding::getConclusion).toList(), List.of())
-            );
+            ));
             context.addFinding(new AgentFinding(
                     "RiskWorker", "LLM 综合风险分析", riskReport.getSummary(),
                     riskReport.getConfidence(), riskReport.getEvidence(), riskReport.getRecommendedAction()
             ));
 
             RiskReport initialRiskReport = riskReport;
-            ReviewReport reviewReport = runAgent(
+            ReviewReport reviewReport = checkpoints.restoreOrExecute(applicationId, "INDEPENDENT_REVIEW",
+                    ReviewReport.class, () -> runAgent(
                     applicationId,
                     "ReviewWorker",
                     "独立 LLM 证据与结论复核",
                     "riskAction=" + initialRiskReport.getRecommendedAction(),
                     () -> reviewWorker.review(initialRiskReport, fraudRiskResult, repaymentResult)
-            );
+            ));
 
             // 复核不通过时只允许一次定向返工，防止 Agent 互相否定形成无限循环。
             if (!Boolean.TRUE.equals(reviewReport.getAccepted())) {
                 List<String> instructions = reviewReport.getRevisionInstructions() == null
                         ? List.of("根据复核意见重新核对事实和证据") : reviewReport.getRevisionInstructions();
-                riskReport = runAgent(applicationId, "RiskWorker", "按复核意见返工一次",
+                riskReport = checkpoints.restoreOrExecute(applicationId, "RISK_REVISION",
+                        RiskReport.class, () -> runAgent(applicationId, "RiskWorker", "按复核意见返工一次",
                         "issues=" + instructions.size(),
                         () -> riskWorker.analyze(application, fraudRiskResult, repaymentResult,
-                                context.getFindings().stream().map(AgentFinding::getConclusion).toList(), instructions));
+                                context.getFindings().stream().map(AgentFinding::getConclusion).toList(), instructions)));
                 RiskReport revisedRiskReport = riskReport;
-                reviewReport = runAgent(applicationId, "ReviewWorker", "复核返工后的风险报告",
-                        "revision=1", () -> reviewWorker.review(revisedRiskReport, fraudRiskResult, repaymentResult));
+                reviewReport = checkpoints.restoreOrExecute(applicationId, "REVISION_REVIEW",
+                        ReviewReport.class, () -> runAgent(applicationId, "ReviewWorker", "复核返工后的风险报告",
+                        "revision=1", () -> reviewWorker.review(revisedRiskReport, fraudRiskResult, repaymentResult)));
             }
 
             context.addFinding(new AgentFinding(
@@ -248,14 +261,15 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
 
             RiskReport finalRiskReport = riskReport;
             ReviewReport finalReviewReport = reviewReport;
-            DecisionProposal proposal = runAgent(
+            DecisionProposal proposal = checkpoints.restoreOrExecute(applicationId, "FINAL_DECISION",
+                    DecisionProposal.class, () -> runAgent(
                     applicationId,
                     "DecisionWorker",
                     "LLM 生成最终审批建议",
                     "risk=" + finalRiskReport.getRecommendedAction()
                             + "/review=" + finalReviewReport.getRecommendedAction(),
                     () -> decisionWorker.decide(application, finalRiskReport, finalReviewReport, repaymentResult)
-            );
+            ));
             ApprovalDecision decision = runAgent(applicationId, "PolicyGuard", "确定性安全护栏",
                     proposal.getDecision(), () -> policyGuard.validate(application, documentResult,
                             fraudRiskResult, repaymentResult, finalReviewReport, proposal));
@@ -263,7 +277,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
             addPolicyHit(applicationId, decision);
             finishByDecision(application, decision, fraudRiskResult);
         } catch (RuntimeException ex) {
-            // 必须抛出异常使当前事务回滚，否则消费者无法判断本次审批是否需要重试。
+            // Each durable step is committed independently; retry resumes from the persisted application status.
             throw new IllegalStateException("自动审批执行失败：" + ex.getMessage(), ex);
         }
     }

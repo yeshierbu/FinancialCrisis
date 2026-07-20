@@ -25,6 +25,7 @@ export function authenticate(username, password) {
     username: normalizedUsername,
     role: account.role,
     displayName: account.displayName,
+    authorization: `Basic ${btoa(`${normalizedUsername}:${password}`)}`,
   };
 }
 

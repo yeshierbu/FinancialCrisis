@@ -18,6 +18,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import com.erbu.financialcrisis.security.CurrentAccount;
+import com.erbu.financialcrisis.common.BusinessException;
 
 /**
  * 贷款申请业务服务实现。
@@ -30,8 +32,10 @@ import java.util.UUID;
 public class LoanApplicationServiceImpl implements LoanApplicationService {
 
     private final ApprovalStore store;
-    public LoanApplicationServiceImpl(ApprovalStore store) {
+    private final CurrentAccount currentAccount;
+    public LoanApplicationServiceImpl(ApprovalStore store, CurrentAccount currentAccount) {
         this.store = store;
+        this.currentAccount = currentAccount;
     }
 
     @Override
@@ -54,6 +58,7 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
                 ApplicationStatus.SUBMITTED,
                 "申请已提交，等待自动审批预处理",
                 request.getChannelCode(),
+                currentAccount.username(),
                 now,
                 now
         );
@@ -74,19 +79,21 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
 
     @Override
     public List<LoanApplicationResponse> listApplications() {
-        return store.listApplications().stream()
+        List<LoanApplication> applications = currentAccount.privileged()
+                ? store.listApplications() : store.listApplicationsOwnedBy(currentAccount.username());
+        return applications.stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     @Override
     public LoanApplicationResponse getApplication(Long applicationId) {
-        return toResponse(store.getApplicationOrThrow(applicationId));
+        return toResponse(getAuthorized(applicationId));
     }
 
     @Override
     public ApplicationStatusResponse getApplicationStatus(Long applicationId) {
-        LoanApplication application = store.getApplicationOrThrow(applicationId);
+        LoanApplication application = getAuthorized(applicationId);
         List<StatusTimelineResponse> timeline = store.listStateLogs(applicationId).stream()
                 .map(this::toTimelineResponse)
                 .toList();
@@ -103,6 +110,11 @@ public class LoanApplicationServiceImpl implements LoanApplicationService {
     private String generateApplicationNo() {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
         return "APP" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + suffix;
+    }
+
+    private LoanApplication getAuthorized(Long applicationId) {
+        return currentAccount.privileged() ? store.getApplicationOrThrow(applicationId)
+                : store.getOwnedApplicationOrThrow(applicationId, currentAccount.username());
     }
 
     private LoanApplicationResponse toResponse(LoanApplication application) {

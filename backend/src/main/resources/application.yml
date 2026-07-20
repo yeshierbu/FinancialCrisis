@@ -10,6 +10,12 @@ spring:
     driver-class-name: ${DB_DRIVER:com.mysql.cj.jdbc.Driver}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: true
+    clean-disabled: true
   servlet:
     multipart:
       max-file-size: 10MB
@@ -81,6 +87,7 @@ approval:
     retry-delay-ms: ${APPROVAL_RETRY_DELAY_MS:30000}
     max-retries: ${APPROVAL_MAX_RETRIES:3}
     publisher-batch-size: ${APPROVAL_PUBLISHER_BATCH_SIZE:20}
+    consume-lease-seconds: ${APPROVAL_CONSUME_LEASE_SECONDS:120}
   documents:
     required-types: ${REQUIRED_DOCUMENT_TYPES:ID_CARD_FRONT,ID_CARD_BACK,BANK_STATEMENT}
   fraud:

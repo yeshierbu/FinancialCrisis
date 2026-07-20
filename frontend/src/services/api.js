@@ -9,8 +9,11 @@ export class ApiError extends Error {
 }
 
 async function request(path, options = {}) {
+  let authorization = null
+  try { authorization = JSON.parse(localStorage.getItem('financial-crisis-session'))?.authorization } catch {}
   const headers = {
     Accept: 'application/json',
+    ...(authorization ? { Authorization: authorization } : {}),
     ...(options.headers || {}),
   }
 

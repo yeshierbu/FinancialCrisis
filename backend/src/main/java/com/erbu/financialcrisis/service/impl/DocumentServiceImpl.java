@@ -13,6 +13,7 @@ import com.erbu.financialcrisis.dto.request.SupplementRequest;
 import com.erbu.financialcrisis.dto.response.SupplementResponse;
 import com.erbu.financialcrisis.dto.response.UploadedDocumentResponse;
 import com.erbu.financialcrisis.service.ApprovalTaskService;
+import com.erbu.financialcrisis.service.ApprovalCheckpointService;
 import com.erbu.financialcrisis.service.DocumentService;
 import com.erbu.financialcrisis.service.QianfanOcrService;
 import com.erbu.financialcrisis.store.ApprovalStore;
@@ -31,6 +32,7 @@ import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import com.erbu.financialcrisis.security.CurrentAccount;
 
 /**
  * 申请材料业务服务实现。
@@ -51,15 +53,20 @@ public class DocumentServiceImpl implements DocumentService {
     private final ApprovalTaskService approvalTaskService;
     private final QianfanOcrService qianfanOcrService;
     private final DocumentIntakeTool documentIntakeTool;
+    private final CurrentAccount currentAccount;
+    private final ApprovalCheckpointService checkpoints;
 
     public DocumentServiceImpl(ApprovalStore store,
                                ApprovalTaskService approvalTaskService,
                                QianfanOcrService qianfanOcrService,
-                               DocumentIntakeTool documentIntakeTool) {
+                               DocumentIntakeTool documentIntakeTool, CurrentAccount currentAccount,
+                               ApprovalCheckpointService checkpoints) {
         this.store = store;
         this.approvalTaskService = approvalTaskService;
         this.qianfanOcrService = qianfanOcrService;
         this.documentIntakeTool = documentIntakeTool;
+        this.currentAccount = currentAccount;
+        this.checkpoints = checkpoints;
     }
 
     @Override
@@ -67,7 +74,8 @@ public class DocumentServiceImpl implements DocumentService {
     public UploadedDocumentResponse uploadDocument(Long applicationId,
                                                    DocumentType documentType,
                                                    MultipartFile file) {
-        LoanApplication application = store.getApplicationOrThrow(applicationId);
+        LoanApplication application = authorizedApplication(applicationId);
+        checkpoints.clear(applicationId);
         assertDocumentUploadAllowed(application);
         byte[] fileBytes = readAndValidateFile(file);
         String fileName = safeFileName(file.getOriginalFilename());
@@ -148,7 +156,8 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     @Transactional
     public SupplementResponse submitSupplement(Long applicationId, SupplementRequest request) {
-        LoanApplication application = store.getApplicationOrThrow(applicationId);
+        LoanApplication application = authorizedApplication(applicationId);
+        checkpoints.clear(applicationId);
         if (application.getStatus() != ApplicationStatus.DOCUMENT_PENDING
                 && application.getStatus() != ApplicationStatus.MATERIAL_PENDING) {
             throw new BusinessException(4003, "当前状态不允许提交补充资料");
@@ -218,6 +227,11 @@ public class DocumentServiceImpl implements DocumentService {
                 && application.getStatus() != ApplicationStatus.MATERIAL_PENDING) {
             throw new BusinessException(4003, "当前状态不允许上传材料");
         }
+    }
+
+    private LoanApplication authorizedApplication(Long applicationId) {
+        return currentAccount.privileged() ? store.getApplicationOrThrow(applicationId)
+                : store.getOwnedApplicationOrThrow(applicationId, currentAccount.username());
     }
 
     private byte[] readAndValidateFile(MultipartFile file) {

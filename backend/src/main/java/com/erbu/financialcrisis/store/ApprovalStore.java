@@ -4,12 +4,14 @@ import com.erbu.financialcrisis.common.BusinessException;
 import com.erbu.financialcrisis.domain.entity.*;
 import com.erbu.financialcrisis.domain.enums.ApplicationStatus;
 import com.erbu.financialcrisis.domain.enums.OperatorType;
+import com.erbu.financialcrisis.domain.enums.ReviewStatus;
 import com.erbu.financialcrisis.mapper.*;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 审批数据持久化门面。
@@ -29,6 +31,7 @@ public class ApprovalStore {
     private final ApprovalReportMapper approvalReportMapper;
     private final ToolCallLogMapper toolCallLogMapper;
     private final PolicyHitRecordMapper policyHitRecordMapper;
+    private final com.erbu.financialcrisis.domain.ApplicationStateMachine stateMachine;
 
     public ApprovalStore(LoanApplicationMapper loanApplicationMapper,
                          UploadedDocumentMapper uploadedDocumentMapper,
@@ -40,7 +43,8 @@ public class ApprovalStore {
                          ManualReviewTicketMapper manualReviewTicketMapper,
                          ApprovalReportMapper approvalReportMapper,
                          ToolCallLogMapper toolCallLogMapper,
-                         PolicyHitRecordMapper policyHitRecordMapper) {
+                         PolicyHitRecordMapper policyHitRecordMapper,
+                         com.erbu.financialcrisis.domain.ApplicationStateMachine stateMachine) {
         this.loanApplicationMapper = loanApplicationMapper;
         this.uploadedDocumentMapper = uploadedDocumentMapper;
         this.stateTransitionLogMapper = stateTransitionLogMapper;
@@ -52,6 +56,7 @@ public class ApprovalStore {
         this.approvalReportMapper = approvalReportMapper;
         this.toolCallLogMapper = toolCallLogMapper;
         this.policyHitRecordMapper = policyHitRecordMapper;
+        this.stateMachine = stateMachine;
     }
 
     /** 新增或更新贷款申请。 */
@@ -76,10 +81,20 @@ public class ApprovalStore {
         return loanApplicationMapper.selectAll();
     }
 
+    public List<LoanApplication> listApplicationsOwnedBy(String ownerUsername) {
+        return loanApplicationMapper.selectByOwnerUsername(ownerUsername);
+    }
+
+    public LoanApplication getOwnedApplicationOrThrow(Long applicationId, String ownerUsername) {
+        return Optional.ofNullable(loanApplicationMapper.selectOwnedByApplicationId(applicationId, ownerUsername))
+                .orElseThrow(() -> new BusinessException(4002, "申请单不存在"));
+    }
+
     /**
      * 更新申请状态，并同时写入一条状态流转日志。
      * 调用方应在事务中执行，保证主表状态和审计记录一致。
      */
+    @Transactional
     public void changeStatus(LoanApplication application,
                              ApplicationStatus toStatus,
                              String currentStep,
@@ -88,11 +103,14 @@ public class ApprovalStore {
                              String operatorName,
                              String remark) {
         ApplicationStatus fromStatus = application.getStatus();
+        stateMachine.assertAllowed(fromStatus, toStatus);
         LocalDateTime now = LocalDateTime.now();
+        if (loanApplicationMapper.updateStatusIfCurrent(application.getApplicationId(), fromStatus, toStatus, currentStep, now) != 1) {
+            throw new BusinessException(4003, "申请状态已被其他操作更新，请刷新后重试");
+        }
         application.setStatus(toStatus);
         application.setCurrentStep(currentStep);
         application.setUpdatedAt(now);
-        loanApplicationMapper.updateByApplicationId(application);
 
         stateTransitionLogMapper.insert(new StateTransitionLog(
                 null, application.getApplicationId(), fromStatus, toStatus, triggerEvent,
@@ -167,6 +185,12 @@ public class ApprovalStore {
 
     public Optional<ManualReviewTicket> findReviewTicket(Long applicationId) {
         return Optional.ofNullable(manualReviewTicketMapper.selectByApplicationId(applicationId));
+    }
+
+    public void decidePendingReview(Long applicationId, ReviewStatus status, String comment, LocalDateTime reviewedAt) {
+        if (manualReviewTicketMapper.decidePending(applicationId, status, comment, reviewedAt) != 1) {
+            throw new BusinessException(4003, "人工复核工单已被其他审核员处理");
+        }
     }
 
     public List<ManualReviewTicket> listReviewTickets() {

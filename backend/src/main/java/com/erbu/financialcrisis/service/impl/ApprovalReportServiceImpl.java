@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import com.erbu.financialcrisis.security.CurrentAccount;
 
 /**
  * 审批报告业务服务实现。
@@ -23,15 +24,18 @@ import java.time.LocalDateTime;
 public class ApprovalReportServiceImpl implements ApprovalReportService {
 
     private final ApprovalStore store;
+    private final CurrentAccount currentAccount;
 
-    public ApprovalReportServiceImpl(ApprovalStore store) {
+    public ApprovalReportServiceImpl(ApprovalStore store, CurrentAccount currentAccount) {
         this.store = store;
+        this.currentAccount = currentAccount;
     }
 
     @Override
     @Transactional
     public ApprovalReportResponse getReport(Long applicationId) {
-        LoanApplication application = store.getApplicationOrThrow(applicationId);
+        LoanApplication application = currentAccount.privileged() ? store.getApplicationOrThrow(applicationId)
+                : store.getOwnedApplicationOrThrow(applicationId, currentAccount.username());
         if (application.getStatus() != ApplicationStatus.APPROVED
                 && application.getStatus() != ApplicationStatus.REJECTED) {
             throw new BusinessException(4003, "只有审批通过或拒绝后才能生成审批报告");

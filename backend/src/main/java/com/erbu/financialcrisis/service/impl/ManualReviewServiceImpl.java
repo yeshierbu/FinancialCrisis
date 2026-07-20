@@ -99,6 +99,7 @@ public class ManualReviewServiceImpl implements ManualReviewService {
         LoanApplication application = ensureManualReviewApplication(applicationId);
         ManualReviewTicket ticket = getOrCreateTicket(application);
         LocalDateTime now = LocalDateTime.now();
+        store.decidePendingReview(applicationId, ReviewStatus.APPROVED, request.getReviewComment(), now);
 
         ApprovalDecision decision = new ApprovalDecision(
                 resolveDecisionId(applicationId),
@@ -141,6 +142,7 @@ public class ManualReviewServiceImpl implements ManualReviewService {
         LoanApplication application = ensureManualReviewApplication(applicationId);
         ManualReviewTicket ticket = getOrCreateTicket(application);
         LocalDateTime now = LocalDateTime.now();
+        store.decidePendingReview(applicationId, ReviewStatus.REJECTED, request.getReviewComment(), now);
 
         ApprovalDecision decision = new ApprovalDecision(
                 resolveDecisionId(applicationId),
