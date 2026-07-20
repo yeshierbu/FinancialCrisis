@@ -32,11 +32,13 @@ public class DocumentAnalysisWorker {
         try {
             List<Map<String, Object>> material = documents.stream().map(document -> {
                 Map<String, Object> item = new LinkedHashMap<>();
+                //提取OCR结果
                 item.put("documentType", document.getDocumentType());
                 item.put("ocrStatus", document.getOcrStatus());
                 item.put("ocrResult", document.getParseResultJson());
                 return item;
             }).toList();
+            //上传给LLM
             Map<String, Object> input = new LinkedHashMap<>();
             input.put("declaredApplication", application);
             input.put("intakeToolResult", intakeResult);
