@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.ApprovalExecutionLockMapper">
+    <insert id="insert">
+        INSERT INTO approval_execution_lock (application_id, event_id, locked_by, locked_at, expires_at)
+        VALUES (#{applicationId}, #{eventId}, #{lockedBy}, CURRENT_TIMESTAMP, #{expiresAt})
+    </insert>
+    <delete id="delete">
+        DELETE FROM approval_execution_lock WHERE application_id=#{applicationId} AND event_id=#{eventId}
+    </delete>
+    <delete id="deleteExpired">
+        DELETE FROM approval_execution_lock WHERE application_id=#{applicationId} AND expires_at &lt; #{now}
+    </delete>
+</mapper>

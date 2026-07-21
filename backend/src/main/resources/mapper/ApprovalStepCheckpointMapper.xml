@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.ApprovalStepCheckpointMapper">
+    <select id="select" resultType="com.erbu.financialcrisis.domain.entity.ApprovalStepCheckpoint">
+        SELECT id, application_id, step_name, state_json, completed_at, created_at
+        FROM approval_step_checkpoint WHERE application_id=#{applicationId} AND step_name=#{stepName}
+    </select>
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO approval_step_checkpoint(application_id, step_name, state_json, completed_at, created_at)
+        VALUES(#{applicationId}, #{stepName}, #{stateJson}, #{completedAt}, #{createdAt})
+    </insert>
+    <delete id="deleteByApplicationId">DELETE FROM approval_step_checkpoint WHERE application_id=#{applicationId}</delete>
+</mapper>

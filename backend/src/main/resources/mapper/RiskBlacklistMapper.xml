@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.RiskBlacklistMapper">
+    <select id="selectActive" resultType="com.erbu.financialcrisis.domain.entity.RiskBlacklistHit">
+        SELECT subject_type, risk_level, reason_code, source
+        FROM risk_blacklist
+        WHERE subject_type = #{subjectType}
+          AND subject_hash = #{subjectHash}
+          AND status = 'ACTIVE'
+          AND effective_from &lt;= CURRENT_TIMESTAMP
+          AND (effective_to IS NULL OR effective_to &gt;= CURRENT_TIMESTAMP)
+        LIMIT 1
+    </select>
+</mapper>

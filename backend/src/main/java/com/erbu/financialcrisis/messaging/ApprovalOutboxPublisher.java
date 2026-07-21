@@ -36,25 +36,33 @@ public class ApprovalOutboxPublisher {
         this.batchSize = batchSize;
     }
 
-    @Scheduled(fixedDelayString = "${approval.messaging.publish-interval-ms:1000}")
+    @Scheduled(fixedDelayString = "${approval.messaging.publish-interval-ms:1000}")//定时扫描
     public void publishPending() {
-        mapper.resetStalePublishing(LocalDateTime.now().minusMinutes(1));
+        mapper.resetStalePublishing(LocalDateTime.now().minusMinutes(1));  //pending的时候服务宕机的话，超过一分钟会把卡住的记录回复成RETRY
+         //查询待发送事件
         for (ApprovalOutbox event : mapper.selectPending(batchSize)) {
+            //抢占发布权，数据库CAS抢占机制（001标记）
             if (mapper.claim(event.getId()) != 1) continue;
             try {
+                //发布前转换成java对象
                 ApprovalStartMessage payload = objectMapper.readValue(
                         event.getPayloadJson(), ApprovalStartMessage.class);
+
                 CorrelationData correlation = new CorrelationData(event.getEventId());
+                //发送RabbitMQ
                 rabbitTemplate.convertAndSend(ApprovalRabbitConfig.APPROVAL_EXCHANGE,
                         event.getRoutingKey(), payload, message -> {
                             message.getMessageProperties().setMessageId(event.getEventId());
                             message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
                             return message;
                         }, correlation);
+                //最多等待10秒Broker
                 CorrelationData.Confirm confirm = correlation.getFuture().get(10, TimeUnit.SECONDS);
                 if (!confirm.isAck()) throw new IllegalStateException("RabbitMQ NACK: " + confirm.getReason());
+                //返回ack
                 mapper.markPublished(event.getId());
             } catch (Exception ex) {
+                //返回NACK，超时或连接失败
                 log.warn("审批 Outbox 发送失败，eventId={}", event.getEventId(), ex);
                 mapper.markRetry(event.getId(), safeMessage(ex), LocalDateTime.now().plusSeconds(5));
             }

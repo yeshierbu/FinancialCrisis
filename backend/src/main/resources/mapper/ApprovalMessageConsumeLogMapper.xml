@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.ApprovalMessageConsumeLogMapper">
+    <select id="selectByEventId" resultType="com.erbu.financialcrisis.domain.entity.ApprovalMessageConsumeLog">
+        SELECT * FROM approval_message_consume_log WHERE event_id=#{eventId} LIMIT 1
+    </select>
+    <insert id="insertProcessing" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO approval_message_consume_log
+        (event_id, application_id, consume_status, consumer_name, retry_count, claim_token, lease_until, attempt_no, started_at, created_at, updated_at)
+        VALUES (#{eventId}, #{applicationId}, 'PROCESSING', #{consumerName}, #{retryCount}, #{claimToken}, #{leaseUntil}, #{attemptNo},
+                #{startedAt}, #{createdAt}, #{updatedAt})
+    </insert>
+    <update id="retryClaim">
+        UPDATE approval_message_consume_log SET consume_status='PROCESSING', consumer_name=#{consumerName},
+        retry_count=#{retryCount}, claim_token=#{claimToken}, lease_until=#{leaseUntil}, attempt_no=attempt_no+1,
+        started_at=CURRENT_TIMESTAMP, last_error=NULL, updated_at=CURRENT_TIMESTAMP
+        WHERE event_id=#{eventId} AND (consume_status IN ('FAILED','RETRY') OR (consume_status='PROCESSING' AND lease_until &lt; CURRENT_TIMESTAMP))
+    </update>
+    <update id="markCompleted">
+        UPDATE approval_message_consume_log SET consume_status='COMPLETED', completed_at=CURRENT_TIMESTAMP,
+        lease_until=NULL, updated_at=CURRENT_TIMESTAMP WHERE event_id=#{eventId} AND claim_token=#{claimToken}
+    </update>
+    <update id="markFailed">
+        UPDATE approval_message_consume_log SET consume_status='FAILED', retry_count=#{retryCount},
+        last_error=#{lastError}, lease_until=NULL, updated_at=CURRENT_TIMESTAMP WHERE event_id=#{eventId} AND claim_token=#{claimToken}
+    </update>
+</mapper>

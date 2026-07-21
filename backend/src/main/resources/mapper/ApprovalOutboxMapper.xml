@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.erbu.financialcrisis.mapper.ApprovalOutboxMapper">
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO approval_outbox
+        (event_id, application_id, event_type, routing_key, payload_json, publish_status,
+         retry_count, created_at, updated_at)
+        VALUES (#{eventId}, #{applicationId}, #{eventType}, #{routingKey}, #{payloadJson},
+                #{publishStatus}, #{retryCount}, #{createdAt}, #{updatedAt})
+    </insert>
+    <select id="selectPending" resultType="com.erbu.financialcrisis.domain.entity.ApprovalOutbox">
+        SELECT * FROM approval_outbox
+        WHERE publish_status IN ('PENDING', 'RETRY')
+          AND (next_retry_at IS NULL OR next_retry_at &lt;= CURRENT_TIMESTAMP)
+        ORDER BY id LIMIT #{limit}
+    </select>
+    <update id="claim">
+        UPDATE approval_outbox SET publish_status='PUBLISHING', updated_at=CURRENT_TIMESTAMP
+        WHERE id=#{id} AND publish_status IN ('PENDING', 'RETRY')
+    </update>
+    <update id="markPublished">
+        UPDATE approval_outbox SET publish_status='PUBLISHED', published_at=CURRENT_TIMESTAMP,
+        updated_at=CURRENT_TIMESTAMP WHERE id=#{id}
+    </update>
+    <update id="markRetry">
+        UPDATE approval_outbox SET publish_status='RETRY', retry_count=retry_count+1,
+        next_retry_at=#{nextRetryAt}, last_error=#{lastError},
+        updated_at=CURRENT_TIMESTAMP WHERE id=#{id}
+    </update>
+    <update id="markConsumed">
+        UPDATE approval_outbox SET publish_status='CONSUMED', updated_at=CURRENT_TIMESTAMP
+        WHERE event_id=#{eventId}
+    </update>
+    <update id="resetStalePublishing">
+        UPDATE approval_outbox SET publish_status='RETRY', next_retry_at=CURRENT_TIMESTAMP,
+        last_error='STALE_PUBLISHING_RECOVERED', updated_at=CURRENT_TIMESTAMP
+        WHERE publish_status='PUBLISHING' AND updated_at &lt; #{cutoff}
+    </update>
+</mapper>
