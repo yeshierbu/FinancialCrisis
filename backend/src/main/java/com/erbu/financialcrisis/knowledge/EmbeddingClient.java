@@ -32,6 +32,11 @@ public class EmbeddingClient {
         return enabled && apiKey != null && !apiKey.isBlank();
     }
 
+    /**
+     * 调用Embeding大模型向量化传入的text文本，返回一组向量
+     * @param text
+     * @return
+     */
     public List<Double> embed(String text) {
         if (!isAvailable()) {
             return List.of();

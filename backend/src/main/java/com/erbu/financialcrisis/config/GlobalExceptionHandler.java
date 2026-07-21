@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
  * 全局异常处理器。
- * 第一版先做轻量封装，后续可以继续增加日志、traceId 和错误码字典。
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {

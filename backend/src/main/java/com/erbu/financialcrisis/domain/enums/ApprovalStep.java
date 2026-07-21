@@ -1,0 +1,14 @@
+package com.erbu.financialcrisis.domain.enums;
+
+public enum ApprovalStep {
+    DOCUMENT_INTAKE,
+    DOCUMENT_ANALYSIS,
+    FRAUD_ASSESSMENT,
+    REPAYMENT_ASSESSMENT,
+    RISK_ANALYSIS,
+    INDEPENDENT_REVIEW,
+    RISK_REVISION,
+    REVISION_REVIEW,
+    FINAL_DECISION,
+    POLICY_GUARD
+}
