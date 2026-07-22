@@ -2,7 +2,7 @@ package com.erbu.financialcrisis;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.erbu.financialcrisis.service.QianfanOcrService;
+import com.erbu.financialcrisis.service.QwenOcrService;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.output.Response;
@@ -49,7 +49,7 @@ class FinancialCrisisApplicationTests {
     private ChatLanguageModel chatLanguageModel;
 
     @MockBean
-    private QianfanOcrService qianfanOcrService;
+    private QwenOcrService qwenOcrService;
 
     @BeforeEach
     void mockMultiAgentResponses() {
@@ -79,8 +79,8 @@ class FinancialCrisisApplicationTests {
                 """;
         when(chatLanguageModel.generate(anyList()))
                 .thenReturn(Response.from(AiMessage.from(json)));
-        when(qianfanOcrService.recognize(any(), anyString()))
-                .thenReturn("{\"provider\":\"BAIDU_QIANFAN\",\"model\":\"deepseek-ocr\",\"text\":\"mock OCR text\"}");
+        when(qwenOcrService.recognize(any(), anyString()))
+                .thenReturn("{\"provider\":\"DASHSCOPE_QWEN\",\"model\":\"qwen3.5-ocr\",\"text\":\"mock OCR text\"}");
     }
 
     @Test
@@ -145,7 +145,7 @@ class FinancialCrisisApplicationTests {
 
     @Test
     void ocrFailureMustStopAutomaticApproval() throws Exception {
-        when(qianfanOcrService.recognize(any(), anyString()))
+        when(qwenOcrService.recognize(any(), anyString()))
                 .thenThrow(new IllegalStateException("mock OCR failure"));
 
         String createRequest = """

@@ -125,7 +125,7 @@ public class AgentOrchestrationServiceImpl implements AgentOrchestrationService 
             DocumentIntakeResult documentResult = runAgent(
                     applicationId,
                     "DocumentIntakeTool",
-                    "材料完整性与百度千帆 OCR 结果校验",
+                    "材料完整性与百炼 Qwen OCR 结果校验",
                     "documents=" + documents.size(),
                     () -> documentIntakeTool.collectAndParse(application, documents)
             );

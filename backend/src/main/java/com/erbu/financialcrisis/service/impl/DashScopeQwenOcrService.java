@@ -1,7 +1,7 @@
 package com.erbu.financialcrisis.service.impl;
 
 import com.erbu.financialcrisis.domain.enums.DocumentType;
-import com.erbu.financialcrisis.service.QianfanOcrService;
+import com.erbu.financialcrisis.service.QwenOcrService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -19,13 +19,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 百度千帆 DeepSeek-OCR 客户端。
+ * 阿里云百炼 Qwen OCR 客户端。
  * 图片仅在请求期间以 Base64 data URL 发送，不在本地保存原图。
  */
 @Service
-public class BaiduQianfanOcrService implements QianfanOcrService {
+public class DashScopeQwenOcrService implements QwenOcrService {
 
-    private static final Logger log = LoggerFactory.getLogger(BaiduQianfanOcrService.class);
+    private static final Logger log = LoggerFactory.getLogger(DashScopeQwenOcrService.class);
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
@@ -33,13 +33,13 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
     private final String model;
     private final boolean fallbackToMock;
 
-    public BaiduQianfanOcrService(RestClient.Builder restClientBuilder,
+    public DashScopeQwenOcrService(RestClient.Builder restClientBuilder,
                                   ObjectMapper objectMapper,
-                                  @Value("${ocr.baidu.base-url:https://qianfan.baidubce.com/v2}") String baseUrl,
-                                  @Value("${ocr.baidu.api-key:}") String apiKey,
-                                  @Value("${ocr.baidu.model:deepseek-ocr}") String model,
-                                  @Value("${ocr.baidu.timeout-seconds:60}") long timeoutSeconds,
-                                  @Value("${ocr.baidu.fallback-to-mock:false}") boolean fallbackToMock) {
+                                   @Value("${ocr.qwen.base-url:https://dashscope.aliyuncs.com/compatible-mode/v1}") String baseUrl,
+                                   @Value("${ocr.qwen.api-key:}") String apiKey,
+                                   @Value("${ocr.qwen.model:qwen3.5-ocr}") String model,
+                                   @Value("${ocr.qwen.timeout-seconds:60}") long timeoutSeconds,
+                                   @Value("${ocr.qwen.fallback-to-mock:false}") boolean fallbackToMock) {
         Duration timeout = Duration.ofSeconds(timeoutSeconds);
         HttpClient httpClient = HttpClient.newBuilder().connectTimeout(timeout).build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
@@ -84,11 +84,11 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
                     .path("content")
                     .asText();
             if (recognizedText.isBlank()) {
-                throw new IllegalStateException("百度千帆 DeepSeek-OCR 返回内容为空");
+                throw new IllegalStateException("百炼 Qwen OCR 返回内容为空");
             }
 
             return objectMapper.writeValueAsString(Map.of(
-                    "provider", "BAIDU_QIANFAN",
+                    "provider", "DASHSCOPE_QWEN",
                     "model", model,
                     "documentType", documentType.name(),
                     "text", recognizedText,
@@ -98,7 +98,7 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
             String providerError = summarizeProviderError(ex.getResponseBodyAsString());
             if (fallbackToMock) {
                 log.warn(
-                        "百度千帆 DeepSeek-OCR 请求失败，开发环境已启用模拟降级，documentType={}, model={}, httpStatus={}, providerError={}",
+                        "百炼 Qwen OCR 请求失败，开发环境已启用模拟降级，documentType={}, model={}, httpStatus={}, providerError={}",
                         documentType,
                         model,
                         ex.getStatusCode().value(),
@@ -111,7 +111,7 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
                 );
             }
             log.error(
-                    "百度千帆 DeepSeek-OCR 请求失败，documentType={}, model={}, httpStatus={}, providerError={}",
+                    "百炼 Qwen OCR 请求失败，documentType={}, model={}, httpStatus={}, providerError={}",
                     documentType,
                     model,
                     ex.getStatusCode().value(),
@@ -119,14 +119,14 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
                     ex
             );
             throw new IllegalStateException(
-                    "百度千帆 DeepSeek-OCR 调用失败，HTTP "
+                    "百炼 Qwen OCR 调用失败，HTTP "
                             + ex.getStatusCode().value() + "，" + providerError,
                     ex
             );
         } catch (Exception ex) {
             if (fallbackToMock) {
                 log.warn(
-                        "百度千帆 DeepSeek-OCR 调用失败，开发环境已启用模拟降级，documentType={}, model={}, reason={}",
+                        "百炼 Qwen OCR 调用失败，开发环境已启用模拟降级，documentType={}, model={}, reason={}",
                         documentType,
                         model,
                         safeLogValue(ex.getMessage())
@@ -138,12 +138,12 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
                 );
             }
             log.error(
-                    "百度千帆 DeepSeek-OCR 调用或响应解析失败，documentType={}, model={}",
+                    "百炼 Qwen OCR 调用或响应解析失败，documentType={}, model={}",
                     documentType,
                     model,
                     ex
             );
-            throw new IllegalStateException("百度千帆 DeepSeek-OCR 调用失败", ex);
+            throw new IllegalStateException("百炼 Qwen OCR 调用失败", ex);
         }
     }
 
@@ -194,13 +194,13 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
         }
         String sanitized = value
                 .replaceAll("[\\r\\n\\t]+", " ")
-                .replaceAll("bce-v3/[^\\s,]+", "[REDACTED]");
+                .replaceAll("sk-[^\\s,]+", "[REDACTED]");
         return sanitized.length() <= 500 ? sanitized : sanitized.substring(0, 500) + "...";
     }
 
     private void validateConfiguration(String imageUrl) {
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("未配置 BAIDU_API_KEY，不能执行真实 OCR");
+            throw new IllegalStateException("未配置 EMBEDDING_API_KEY，不能执行真实 OCR");
         }
         if (imageUrl == null || imageUrl.isBlank()) {
             throw new IllegalArgumentException("OCR 图片内容不能为空");
@@ -210,10 +210,10 @@ public class BaiduQianfanOcrService implements QianfanOcrService {
     private String promptFor(DocumentType documentType) {
         return switch (documentType) {
             case ID_CARD_FRONT, ID_CARD_BACK ->
-                    "<image>\nFree OCR. 忠实提取身份证图片中的全部可见文字，不要猜测缺失内容。";
+                    "忠实提取身份证图片中的全部可见文字，不要猜测缺失内容。";
             case BANK_STATEMENT ->
-                    "<image>\n<|grounding|>Convert the document to markdown. 忠实保留银行流水中的日期、摘要、收入、支出和余额。";
-            default -> "<image>\nFree OCR. 忠实提取图片中的全部可见文字，不要补充不存在的信息。";
+                    "将文档转换为 Markdown，忠实保留银行流水中的日期、摘要、收入、支出和余额。";
+            default -> "忠实提取图片中的全部可见文字，不要补充不存在的信息。";
         };
     }
 }

@@ -37,7 +37,7 @@ public class DocumentIntakeTool {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    /** 检查必需材料是否已通过百度千帆 OCR。
+    /** 检查必需材料是否已通过百炼 Qwen OCR。
      * 检查一笔贷款申请的上传材料是否满足自动审批的最低要求*/
     public DocumentIntakeResult collectAndParse(LoanApplication application, List<UploadedDocument> documents) {
 
@@ -87,7 +87,7 @@ public class DocumentIntakeTool {
                 false,
                 usedMockFallback
                         ? "材料完整，真实 OCR 不可用，已使用模拟 OCR 降级结果 "
-                        : "材料完整，已通过百度千帆 DeepSeek-OCR 识别"
+                        : "材料完整，已通过百炼 Qwen OCR 识别"
         );
     }
 

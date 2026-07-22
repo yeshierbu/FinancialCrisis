@@ -10,13 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class BaiduQianfanOcrServiceTests {
+class DashScopeQwenOcrServiceTests {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void enabledFallbackProducesExplicitMockResult() throws Exception {
-        BaiduQianfanOcrService service = createService(true);
+        DashScopeQwenOcrService service = createService(true);
 
         String result = service.recognize(
                 DocumentType.ID_CARD_FRONT,
@@ -32,7 +32,7 @@ class BaiduQianfanOcrServiceTests {
 
     @Test
     void disabledFallbackStillPropagatesOcrFailure() {
-        BaiduQianfanOcrService service = createService(false);
+        DashScopeQwenOcrService service = createService(false);
 
         assertThrows(IllegalStateException.class, () -> service.recognize(
                 DocumentType.ID_CARD_FRONT,
@@ -40,13 +40,13 @@ class BaiduQianfanOcrServiceTests {
         ));
     }
 
-    private BaiduQianfanOcrService createService(boolean fallbackToMock) {
-        return new BaiduQianfanOcrService(
+    private DashScopeQwenOcrService createService(boolean fallbackToMock) {
+        return new DashScopeQwenOcrService(
                 RestClient.builder(),
                 objectMapper,
                 "http://127.0.0.1:1",
                 "",
-                "deepseek-ocr",
+                "qwen3.5-ocr",
                 1,
                 fallbackToMock
         );

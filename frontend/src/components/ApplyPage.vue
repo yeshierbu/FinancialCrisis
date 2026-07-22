@@ -156,7 +156,7 @@
           <div>
             <h2 class="text-lg font-semibold text-gray-900">上传材料</h2>
             <p class="mt-1 text-sm text-gray-500">
-              图片将发送至百度千帆 DeepSeek-OCR 识别，原图不会保存在本地数据库。
+              图片将发送至阿里云百炼 Qwen OCR 识别，原图不会保存在本地数据库。
             </p>
           </div>
           <span

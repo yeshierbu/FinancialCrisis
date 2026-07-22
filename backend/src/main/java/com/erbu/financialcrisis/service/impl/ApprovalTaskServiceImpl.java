@@ -40,6 +40,11 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
         this.messagingEnabled = messagingEnabled;
     }
 
+    /**
+     * 首个审批步骤
+     * @param applicationId
+     * @return
+     */
     @Override
     public String submit(Long applicationId) {
         return submitStep(applicationId, ApprovalStep.DOCUMENT_INTAKE);
@@ -55,6 +60,13 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
         return persistStep(applicationId, step, UUID.randomUUID().toString());
     }
 
+    /**
+     * 为首次审批步骤生成一个唯一eventId
+     * @param applicationId
+     * @param step
+     * @param parentEventId
+     * @return
+     */
     @Override
     public String submitStep(Long applicationId, ApprovalStep step, String parentEventId) {
         if (!messagingEnabled) return submitStep(applicationId, step);

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * @param eventId 消息事件 ID，用于消费幂等和防止 RabbitMQ 重复投递导致重复审批：这笔申请中的哪一个审批步骤事件
  * @param applicationId 贷款申请 ID，用于定位要处理的申请记录：哪一笔贷款申请
  * @param applicationNo 贷款申请编号，用于日志、排查和人工识别
- * @param step 表示当亲啊消息应该执行哪个审批步骤
+ * @param step 表示当前消息应该执行哪个审批步骤
  * @param retryCount 当前消息已经重试的次数，用于判断是否超过最大重试上限
  * @param createdAt 原始消息创建时间，用于追踪消息生命周期
  */

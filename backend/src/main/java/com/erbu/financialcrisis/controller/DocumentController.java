@@ -30,7 +30,7 @@ public class DocumentController {
         this.documentService = documentService;
     }
 
-    /** 接收真实图片、调用百度千帆 OCR，并重新触发审批流程。 */
+    /** 接收真实图片、调用百炼 Qwen OCR，并重新触发审批流程。 */
     @PostMapping(value = "/{applicationId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<UploadedDocumentResponse> uploadDocument(@PathVariable Long applicationId,
                                                            @RequestParam("documentType") DocumentType documentType,

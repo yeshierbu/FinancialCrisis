@@ -11,7 +11,7 @@
 - 使用演示客户账号登录。
 - 创建贷款申请。
 - 上传身份证、银行流水、收入证明、征信报告等材料。
-- 调用百度千帆 DeepSeek-OCR 识别材料内容。
+- 调用阿里云百炼 Qwen3.5-OCR 识别材料内容。
 - 查询申请状态和最终审批结果。
 - 查看审批报告。
 
@@ -67,7 +67,7 @@ Spring Boot REST API
           |
           +-- DeepSeek：四个 LLM Worker
           +-- DashScope：text-embedding-v4
-          +-- 百度千帆：DeepSeek-OCR
+          +-- 阿里云百炼：Qwen3.5-OCR
 ```
 
 ## 3. 多 Agent 如何协作
@@ -367,12 +367,11 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-v4-flash
 LLM_TIMEOUT_SECONDS=45
 
-# 百度千帆 DeepSeek-OCR
-BAIDU_API_KEY=你的百度千帆APIKey
-BAIDU_OCR_BASE_URL=https://qianfan.baidubce.com/v2
-BAIDU_OCR_MODEL=deepseek-ocr
-BAIDU_OCR_TIMEOUT_SECONDS=60
-BAIDU_OCR_FALLBACK_TO_MOCK=true
+# 阿里云百炼 Qwen OCR（与 Embedding 共用 EMBEDDING_API_KEY）
+QWEN_OCR_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_OCR_MODEL=qwen3.5-ocr
+QWEN_OCR_TIMEOUT_SECONDS=60
+QWEN_OCR_FALLBACK_TO_MOCK=true
 
 # DashScope Embedding + Qdrant
 KNOWLEDGE_ENABLED=true
@@ -406,8 +405,8 @@ APPROVAL_RETRY_DELAY_MS=30000
 | `DEEPSEEK_API_KEY` | 启用 LLM 时 | DeepSeek API Key |
 | `DEEPSEEK_BASE_URL` | 否 | 默认 `https://api.deepseek.com` |
 | `DEEPSEEK_MODEL` | 否 | DeepSeek 模型名称 |
-| `BAIDU_API_KEY` | 真实 OCR 时 | 百度千帆模型 API Key |
-| `BAIDU_OCR_FALLBACK_TO_MOCK` | 否 | `true` 时 OCR 失败使用开发模拟结果 |
+| `QWEN_OCR_MODEL` | 否 | OCR 模型，默认 `qwen3.5-ocr` |
+| `QWEN_OCR_FALLBACK_TO_MOCK` | 否 | `true` 时 OCR 失败使用开发模拟结果 |
 | `KNOWLEDGE_ENABLED` | 政策 RAG 时 | 是否启用 Embedding 和 Qdrant |
 | `EMBEDDING_API_KEY` | 启用知识库时 | DashScope API Key |
 | `EMBEDDING_MODEL` | 否 | 当前使用 `text-embedding-v4` |
@@ -641,7 +640,7 @@ cd backend
 mvn test
 ```
 
-测试环境使用 H2，不依赖本机 MySQL、Qdrant、DeepSeek 或百度千帆。
+测试环境使用 H2，不依赖本机 MySQL、Qdrant、DeepSeek 或阿里云百炼。
 
 当前测试覆盖：
 
@@ -726,19 +725,18 @@ QDRANT_URL=http://localhost:6333
 
 修改 `.env` 后需要完整重启 Spring Boot。
 
-### 17.6 `invalid_iam_token` 或 OCR 返回 401
+### 17.6 OCR 返回 401
 
-这表示百度千帆鉴权失败，不是 MySQL 或 Qdrant 问题。常见原因：
+这表示阿里云百炼鉴权失败，不是 MySQL 或 Qdrant 问题。常见原因：
 
-- `BAIDU_API_KEY` 无效或已经过期。
-- 使用了百度云 Access Key，而不是千帆模型 API Key。
+- `EMBEDDING_API_KEY` 无效或已经过期。
 - IDEA 运行配置中的旧变量覆盖了 `.env`。
 - 当前账号没有模型权限或可用额度。
 
 开发阶段可以使用：
 
 ```properties
-BAIDU_OCR_FALLBACK_TO_MOCK=true
+QWEN_OCR_FALLBACK_TO_MOCK=true
 ```
 
 此时 OCR 失败会返回明确标记的模拟结果，只能用于开发测试。

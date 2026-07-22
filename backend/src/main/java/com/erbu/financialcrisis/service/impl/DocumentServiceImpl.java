@@ -15,7 +15,7 @@ import com.erbu.financialcrisis.dto.response.UploadedDocumentResponse;
 import com.erbu.financialcrisis.service.ApprovalTaskService;
 import com.erbu.financialcrisis.service.ApprovalCheckpointService;
 import com.erbu.financialcrisis.service.DocumentService;
-import com.erbu.financialcrisis.service.QianfanOcrService;
+import com.erbu.financialcrisis.service.QwenOcrService;
 import com.erbu.financialcrisis.store.ApprovalStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +37,7 @@ import com.erbu.financialcrisis.security.CurrentAccount;
 /**
  * 申请材料业务服务实现。
  *
- * <p>接收身份证、银行流水等真实图片，调用百度千帆 DeepSeek-OCR，
+ * <p>接收身份证、银行流水等真实图片，调用百炼 Qwen OCR，
  * 仅持久化文件元数据和 OCR 文本，不在本地保存原始图片。</p>
  */
 @Service
@@ -51,24 +51,31 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final ApprovalStore store;
     private final ApprovalTaskService approvalTaskService;
-    private final QianfanOcrService qianfanOcrService;
+    private final QwenOcrService qwenOcrService;
     private final DocumentIntakeTool documentIntakeTool;
     private final CurrentAccount currentAccount;
     private final ApprovalCheckpointService checkpoints;
 
     public DocumentServiceImpl(ApprovalStore store,
                                ApprovalTaskService approvalTaskService,
-                               QianfanOcrService qianfanOcrService,
+                               QwenOcrService qwenOcrService,
                                DocumentIntakeTool documentIntakeTool, CurrentAccount currentAccount,
                                ApprovalCheckpointService checkpoints) {
         this.store = store;
         this.approvalTaskService = approvalTaskService;
-        this.qianfanOcrService = qianfanOcrService;
+        this.qwenOcrService = qwenOcrService;
         this.documentIntakeTool = documentIntakeTool;
         this.currentAccount = currentAccount;
         this.checkpoints = checkpoints;
     }
 
+    /**
+     * 用户上传材料在一个MYSQL事务进行
+     * @param applicationId
+     * @param documentType
+     * @param file
+     * @return
+     */
     @Override
     @Transactional
     public UploadedDocumentResponse uploadDocument(Long applicationId,
@@ -93,13 +100,15 @@ public class DocumentServiceImpl implements DocumentService {
                 null,
                 LocalDateTime.now()
         );
+        //保存材料记录
         store.addDocument(document);
 
         try {
+            //调用OCR
             String dataUrl = "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(fileBytes);
-            document.setParseResultJson(qianfanOcrService.recognize(documentType, dataUrl));
-            document.setOcrStatus(OcrStatus.SUCCESS);
-            store.updateDocument(document);
+            document.setParseResultJson(qwenOcrService.recognize(documentType, dataUrl));
+            document.setOcrStatus(OcrStatus.SUCCESS);  //将结果保存到数据库
+            store.updateDocument(document);  //将SUCCESS状态也保存数据库
         } catch (RuntimeException ex) {
             log.error(
                     "材料 OCR 失败，applicationId={}, documentId={}, documentType={}, contentType={}, fileSize={}",
@@ -111,18 +120,18 @@ public class DocumentServiceImpl implements DocumentService {
                     ex
             );
             document.setOcrStatus(OcrStatus.FAILED);
-            document.setParseResultJson("{\"provider\":\"BAIDU_QIANFAN\",\"error\":\"OCR_FAILED\"}");
+            document.setParseResultJson("{\"provider\":\"DASHSCOPE_QWEN\",\"error\":\"OCR_FAILED\"}");
             store.updateDocument(document);
             store.changeStatus(
                     application,
                     ApplicationStatus.DOCUMENT_PENDING,
-                    "百度千帆 OCR 识别失败，请重新上传清晰图片",
+                    "百炼 Qwen OCR 识别失败，请重新上传清晰图片",
                     "OCR_FAILED",
                     OperatorType.SYSTEM,
-                    "BaiduQianfanOcrService",
+                    "DashScopeQwenOcrService",
                     ex.getMessage()
             );
-            return toResponse(document);
+            return toResponse(document);  //OCR失败，会停留在DOCUMENT_PENDING状态，不会创建Outbox,也不会进入自动审批
         }
 
         if (!documentIntakeTool.isReadyForApproval(store.listDocuments(applicationId))) {
@@ -180,13 +189,13 @@ public class DocumentServiceImpl implements DocumentService {
             );
             store.addDocument(document);
             try {
-                document.setParseResultJson(qianfanOcrService.recognize(
+                document.setParseResultJson(qwenOcrService.recognize(
                         documentRequest.getDocumentType(), documentRequest.getFileUrl()
                 ));
                 document.setOcrStatus(OcrStatus.SUCCESS);
             } catch (RuntimeException ex) {
                 document.setOcrStatus(OcrStatus.FAILED);
-                document.setParseResultJson("{\"provider\":\"BAIDU_QIANFAN\",\"error\":\"OCR_FAILED\"}");
+                document.setParseResultJson("{\"provider\":\"DASHSCOPE_QWEN\",\"error\":\"OCR_FAILED\"}");
                 ocrFailed = true;
             }
             store.updateDocument(document);
@@ -199,7 +208,7 @@ public class DocumentServiceImpl implements DocumentService {
                     "部分补充材料 OCR 识别失败，请重新上传",
                     "OCR_FAILED",
                     OperatorType.SYSTEM,
-                    "BaiduQianfanOcrService",
+                    "DashScopeQwenOcrService",
                     "补充材料 OCR 失败"
             );
             return new SupplementResponse(applicationId, application.getStatus(), application.getCurrentStep());
